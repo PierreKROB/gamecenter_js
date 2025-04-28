@@ -1,0 +1,2866 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+<additional_info>
+
+</additional_info>
+
+</file_summary>
+
+<directory_structure>
+.gitignore
+backend/.gitignore
+backend/babel.config.js
+backend/package.json
+backend/public/favicon/about.txt
+backend/public/favicon/site.webmanifest
+backend/public/index.html
+backend/src/app.js
+backend/src/config/config.js
+backend/src/config/initialData.js
+backend/src/config/logger.js
+backend/src/config/mongoose.js
+backend/src/config/morgan.js
+backend/src/config/passport.js
+backend/src/controllers/authController.js
+backend/src/controllers/roleController.js
+backend/src/controllers/userController.js
+backend/src/middlewares/authenticate.js
+backend/src/middlewares/error.js
+backend/src/middlewares/rateLimiter.js
+backend/src/middlewares/validate.js
+backend/src/models/permissionModel.js
+backend/src/models/plugins/paginatePlugin.js
+backend/src/models/plugins/toJSONPlugin.js
+backend/src/models/roleModel.js
+backend/src/models/tokenModel.js
+backend/src/models/userModel.js
+backend/src/routes/v1/authRoute.js
+backend/src/routes/v1/index.js
+backend/src/routes/v1/roleRoute.js
+backend/src/routes/v1/userRoute.js
+backend/src/server.js
+backend/src/services/emailService/index.js
+backend/src/services/emailService/template.js
+backend/src/services/jwtService.js
+backend/src/services/tokenService.js
+backend/src/utils/apiError.js
+backend/src/utils/catchAsync.js
+backend/src/validations/authValidation.js
+backend/src/validations/customValidation.js
+backend/src/validations/roleValidation.js
+backend/src/validations/userValidation.js
+frontend/.gitignore
+frontend/index.html
+frontend/package.json
+frontend/public/vite.svg
+frontend/src/counter.js
+frontend/src/javascript.svg
+frontend/src/main.js
+frontend/src/style.css
+readme.md
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path=".gitignore">
+backend/.env
+backend/node_modules
+backend/logs
+backend/dist
+</file>
+
+<file path="backend/.gitignore">
+.env
+node_modules
+logs
+dist
+</file>
+
+<file path="backend/babel.config.js">
+module.exports = {
+    presets: [
+      [
+        '@babel/preset-env',
+        {
+          targets: {
+            node: 'current', // Configure pour l'environnement Node.js actuel
+          },
+        },
+      ],
+    ],
+    plugins: [
+      [
+        'babel-plugin-root-import',
+        {
+          paths: [
+            {
+              rootPathPrefix: '~/',
+              rootPathSuffix: 'src', // La racine pointe vers le dossier src
+            },
+          ],
+        },
+      ],
+      '@babel/plugin-transform-runtime', // Optimise les helpers Babel
+    ],
+  };
+</file>
+
+<file path="backend/package.json">
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "./src/server.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "start": "npm run dev",
+    "dev": "cross-env NODE_ENV=development nodemon src/server.js --exec babel-node",
+    "test": "cross-env NODE_ENV=test jest --runInBand",
+    "prod": "cross-env NODE_ENV=production nodemon src/server.js --exec babel-node"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/cli": "^7.25.9",
+    "@babel/core": "^7.26.0",
+    "@babel/node": "^7.26.0",
+    "@babel/plugin-transform-runtime": "^7.25.9",
+    "@babel/preset-env": "^7.26.0",
+    "babel-plugin-root-import": "^6.6.0",
+    "cross-env": "^7.0.3",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.6",
+    "express": "^4.21.1",
+    "express-rate-limit": "^7.4.1",
+    "express-rate-limiter": "^1.3.1",
+    "helmet": "^8.0.0",
+    "http-status": "^2.0.0",
+    "httpstatus": "^1.0.0",
+    "joi": "^17.13.3",
+    "lodash": "^4.17.21",
+    "moment": "^2.30.1",
+    "mongoose": "^8.8.3",
+    "morgan": "^1.10.0",
+    "nodemailer": "^6.10.0",
+    "nodemon": "^3.1.7",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "uuid": "^11.1.0",
+    "winston": "^3.17.0"
+  }
+}
+</file>
+
+<file path="backend/public/favicon/about.txt">
+This favicon was generated using the following font:
+
+- Font Title: Langar
+- Font Author: undefined
+- Font Source: https://fonts.gstatic.com/s/langar/v27/kJEyBukW7AIlgjGVrTVZ99sqrQ.ttf
+- Font License: undefined
+</file>
+
+<file path="backend/public/favicon/site.webmanifest">
+{
+    "name": "",
+    "short_name": "",
+    "icons": [
+        {
+            "src": "/android-chrome-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/android-chrome-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ],
+    "theme_color": "#ffffff",
+    "background_color": "#ffffff",
+    "display": "standalone"
+}
+</file>
+
+<file path="backend/public/index.html">
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon/favicon-16x16.png">
+    <link rel="manifest" href="favicon/site.webmanifest">
+    <title>GG</title>
+    <style>
+        h1 {
+            margin: 0;
+            padding: 0;
+            text-align: center;
+        }
+
+        body {
+            margin: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div>
+        <h1>░██████╗░██████╗░</h1>
+        <h1>██╔════╝██╔════╝░</h1>
+        <h1>██║░░██╗██║░░██╗░</h1>
+        <h1>██║░░╚████║░░╚██╗</h1>
+        <h1>╚██████╔╚██████╔╝</h1>
+        <h1>░╚═════╝░╚═════╝░</h1>       
+        <br>
+        <h1>backend endpoint</h1> 
+    </div>
+</body>
+<!-- si quelqu'un a des idée de quoi mettre ici, je suis preneur -->
+</html>
+</file>
+
+<file path="backend/src/app.js">
+import express from 'express';
+import helmet from 'helmet';
+import cors from 'cors';
+import morgan from 'morgan';
+import config from '~/config/config';
+import passport from '~/config/passport';
+import error from '~/middlewares/error';
+import { globalRateLimiter } from '~/middlewares/rateLimiter';
+import routes from '~/routes/v1';
+
+const app = express();
+
+// Utilisation de Morgan uniquement en environnement "development"
+if (config.NODE_ENV === 'development') {
+    app.use(morgan('dev'));
+}
+
+// Middlewares de sécurité et configuration
+app.use(helmet());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cors());
+app.use(express.static('public'));
+app.use(globalRateLimiter);
+app.use(passport.initialize());
+
+// Routes
+app.use('/api/', routes);
+
+// Gestion des erreurs
+app.use(error.notFound);
+app.use(error.converter);
+app.use(error.handler);
+
+export default app;
+</file>
+
+<file path="backend/src/config/config.js">
+import dotenv from 'dotenv';
+import Joi from 'joi';
+dotenv.config();
+
+// Schéma de validation des variables d'environnement
+const envValidate = Joi.object()
+    .keys({
+        NODE_ENV: Joi.string().valid('production', 'development', 'test').required(),
+        APP_NAME: Joi.string().allow('').empty('').default('App Name'),
+
+        PORT: Joi.number().allow('').empty('').default(3002),
+
+        DB_HOST_PROD: Joi.string().required(),
+        DB_HOST_DEV: Joi.string().required(),
+
+        JWT_ACCESS_TOKEN_SECRET_PRIVATE: Joi.string().required(),
+        JWT_ACCESS_TOKEN_SECRET_PUBLIC: Joi.string().required(),
+        JWT_ACCESS_TOKEN_EXPIRATION_MINUTES: Joi.number().allow('').empty('').default(240),
+
+        REFRESH_TOKEN_EXPIRATION_DAYS: Joi.number().allow('').empty('').default(1),
+        VERIFY_EMAIL_TOKEN_EXPIRATION_MINUTES: Joi.number().allow('').empty('').default(60),
+        RESET_PASSWORD_TOKEN_EXPIRATION_MINUTES: Joi.number().allow('').empty('').default(30),
+
+        SMTP_HOST: Joi.string().allow('').empty(''),
+        SMTP_PORT: Joi.number().allow('').empty(''),
+        SMTP_USERNAME: Joi.string().allow('').empty(''),
+        SMTP_PASSWORD: Joi.string().allow('').empty(''),
+        EMAIL_FROM: Joi.string().allow('').empty(''),
+
+        FRONTEND_URL: Joi.string().allow('').empty('').default('http://localhost:3000'),
+        IMAGE_URL: Joi.string().allow('').empty('').default('http://localhost:3002/images'),
+    })
+    .unknown();
+
+// Validation des variables d'environnement
+const { value: env, error } = envValidate.prefs({ errors: { label: 'key' } }).validate(process.env);
+
+if (error) {
+    throw new Error(`Config env error: ${error.message}`);
+}
+
+// Exporter les configurations
+export default {
+    NODE_ENV: env.NODE_ENV,
+    APP_NAME: env.APP_NAME,
+    PORT: env.PORT,
+
+    // Choisir la base de données en fonction de l'environnement
+    DATABASE_URI: env.NODE_ENV === 'production' ? env.DB_HOST_PROD : env.DB_HOST_DEV,
+    DATABASE_OPTIONS: {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+        retryWrites: true,
+        w: 'majority'
+    },
+
+    JWT_ACCESS_TOKEN_SECRET_PRIVATE: Buffer.from(env.JWT_ACCESS_TOKEN_SECRET_PRIVATE, 'base64'),
+	JWT_ACCESS_TOKEN_SECRET_PUBLIC: Buffer.from(env.JWT_ACCESS_TOKEN_SECRET_PUBLIC, 'base64'),
+    JWT_ACCESS_TOKEN_EXPIRATION_MINUTES: env.JWT_ACCESS_TOKEN_EXPIRATION_MINUTES,
+
+    REFRESH_TOKEN_EXPIRATION_DAYS: env.REFRESH_TOKEN_EXPIRATION_DAYS,
+    VERIFY_EMAIL_TOKEN_EXPIRATION_MINUTES: env.VERIFY_EMAIL_TOKEN_EXPIRATION_MINUTES,
+    RESET_PASSWORD_TOKEN_EXPIRATION_MINUTES: env.RESET_PASSWORD_TOKEN_EXPIRATION_MINUTES,
+
+    SMTP_HOST: env.SMTP_HOST,
+    SMTP_PORT: env.SMTP_PORT,
+    SMTP_USERNAME: env.SMTP_USERNAME,
+    SMTP_PASSWORD: env.SMTP_PASSWORD,
+    EMAIL_FROM: env.EMAIL_FROM,
+
+    FRONTEND_URL: env.FRONTEND_URL,
+    IMAGE_URL: env.IMAGE_URL,
+
+    TOKEN_TYPES: {
+        REFRESH: 'refresh',
+        VERIFY_EMAIL: 'verifyEmail',
+        RESET_PASSWORD: 'resetPassword'
+    }
+};
+</file>
+
+<file path="backend/src/config/initialData.js">
+import Permission from '~/models/permissionModel';
+import Role from '~/models/roleModel';
+
+import logger from './logger';
+
+async function initialData() {
+    try {
+        const countPermissions = await Permission.estimatedDocumentCount();
+        if (countPermissions === 0) {
+            await Permission.create(
+                {
+                    controller: 'user',
+                    action: 'create'
+                },
+                {
+                    controller: 'user',
+                    action: 'read'
+                },
+                {
+                    controller: 'user',
+                    action: 'update'
+                },
+                {
+                    controller: 'user',
+                    action: 'delete'
+                },
+                {
+                    controller: 'role',
+                    action: 'create'
+                },
+                {
+                    controller: 'role',
+                    action: 'read'
+                },
+                {
+                    controller: 'role',
+                    action: 'update'
+                },
+                {
+                    controller: 'role',
+                    action: 'delete'
+                },
+
+            );
+        }
+        const countRoles = await Role.estimatedDocumentCount();
+        if (countRoles === 0) {
+            const permissionsSuperAdministrator = await Permission.find();
+            const permissionsAdministrator = await Permission.find({ controller: 'user' });
+            const permissionsModerator = await Permission.find({ controller: 'user', action: { $ne: 'delete' } });
+            await Role.create(
+                {
+                    name: 'Super Administrator',
+                    permissions: permissionsSuperAdministrator
+                },
+                {
+                    name: 'Administrator',
+                    permissions: permissionsAdministrator
+                },
+                {
+                    name: 'Moderator',
+                    permissions: permissionsModerator
+                },
+                {
+                    name: 'User',
+                    permissions: []
+                }
+            );
+        }
+        //we can add default users here
+    } catch (err) {
+        logger.error(err);
+    }
+    
+}
+
+export default initialData;
+</file>
+
+<file path="backend/src/config/logger.js">
+import winston from 'winston';
+import config from './config';
+// Définir les niveaux de logs
+const levels = {
+    error: 0, // Logs critiques
+    warn: 1,  // Avertissements
+    info: 2,  // Informations générales
+    http: 3,  // Logs des requêtes HTTP
+    debug: 4  // Logs détaillés (utilisés en développement)
+};
+
+// Ajout des couleurs pour améliorer la lisibilité dans la console
+winston.addColors({
+    error: 'red',
+    warn: 'yellow',
+    info: 'green',
+    http: 'magenta',
+    debug: 'white'
+});
+
+// Définir le niveau de log en fonction de l'environnement
+const logLevel = config.NODE_ENV === 'development' ? 'debug' : 'warn';
+
+// Créer une instance Winston
+const logger = winston.createLogger({
+    level: logLevel,
+    levels,
+    format: winston.format.combine(
+        // Ajout d'un timestamp pour chaque log
+        winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+        // Définition d'un format de log personnalisé
+        winston.format.printf(
+            (info) => `${info.timestamp} [${info.level}]: ${info.message}`
+        )
+    ),
+    transports: [
+        // Fichier pour les erreurs critiques
+        new winston.transports.File({
+            level: 'error',
+            filename: 'logs/error.log',
+            maxsize: 10000000, // 10 Mo
+            maxFiles: 10       // Conserver les 10 derniers fichiers
+        }),
+        // Fichier pour tous les logs combinés
+        new winston.transports.File({
+            filename: 'logs/combined.log',
+            maxsize: 10000000, // 10 Mo
+            maxFiles: 10       // Conserver les 10 derniers fichiers
+        })
+    ]
+});
+
+// Ajouter un transport Console si en développement
+if (config.NODE_ENV === 'development') {
+    logger.add(
+        new winston.transports.Console({
+            format: winston.format.combine(
+                winston.format.colorize({ all: true }), // Couleurs pour les logs
+                winston.format.printf(
+                    (info) => `${info.timestamp} [${info.level}]: ${info.message}`
+                )
+            )
+        })
+    );
+}
+
+module.exports = logger;
+</file>
+
+<file path="backend/src/config/mongoose.js">
+import mongoose from 'mongoose';
+import config from './config';
+import logger from './logger';
+
+const mongooseConnect = async () => {
+  try {
+    await mongoose.connect(config.DATABASE_URI);
+    logger.info('🚀 Connected to MongoDB!');
+  } catch (error) {
+    logger.error(`❌ MongoDB connection error: ${error}`);
+    process.exit(1);
+  }
+
+  mongoose.connection.on('disconnected', () => {
+    logger.error('❌ MongoDB disconnected!');
+  });
+
+  mongoose.connection.on('reconnected', () => {
+    logger.info('🚀 MongoDB reconnected!');
+  });
+};
+
+module.exports = mongooseConnect;
+</file>
+
+<file path="backend/src/config/morgan.js">
+import morgan from 'morgan';
+import logger from './logger';
+
+const morganHTTP = morgan('combined', {
+	stream: { write: (message) => logger.http(message.trim()) }
+});
+
+export default morganHTTP;
+</file>
+
+<file path="backend/src/config/passport.js">
+import { Strategy as JwtStrategy, ExtractJwt } from 'passport-jwt';
+import passport from 'passport';
+import config from './config';
+import User from '~/models/userModel';
+
+passport.use(
+	new JwtStrategy(
+		{
+			jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+			secretOrKey: config.JWT_ACCESS_TOKEN_SECRET_PUBLIC,
+			algorithms: 'RS256'
+		},
+		async (jwtPayload, done) => {
+			try {
+				const user = await User.getUser(jwtPayload.sub);
+				if (!user) {
+					return done(null, false);
+				}
+				return done(null, user);
+			} catch (err) {
+				return done(err, false);
+			}
+		}
+	)
+);
+
+export default passport;
+</file>
+
+<file path="backend/src/controllers/authController.js">
+import APIError from '~/utils/apiError';
+import tokenService from '~/services/tokenService';
+import emailService from '~/services/emailService';
+import User from '~/models/userModel';
+import config from '~/config/config';
+import httpStatus from 'http-status';
+import Token from '~/models/tokenModel';
+import Role from '~/models/roleModel';
+
+export const signup = async (req, res) => {
+	const role = await Role.getRoleByName('User');
+	req.body.roles = [role.id];
+	const user = await User.createUser(req.body);
+	const tokens = await tokenService.generateAuthTokens(user);
+	return res.json({
+		success: true,
+		data: { user, tokens }
+	});
+};
+
+export const signin = async (req, res) => {
+	const user = await User.getUserByUserName(req.body.userName);
+	if (!user || !(await user.isPasswordMatch(req.body.password))) {
+		throw new APIError('Incorrect user name or password', httpStatus.BAD_REQUEST);
+	}
+	const tokens = await tokenService.generateAuthTokens(user);
+	return res.json({
+		success: true,
+		data: { user, tokens }
+	});
+};
+
+export const current = async (req, res) => {
+	const user = await User.getUser(req.user.id);
+	if (!user) {
+		throw new APIError('User not found', httpStatus.NOT_FOUND);
+	}
+	return res.json({
+		success: true,
+		data: {
+			firstName: user.firstName,
+			lastName: user.lastName,
+			userName: user.userName,
+			avatarUrl: user.avatarUrl
+		}
+	});
+};
+
+export const getMe = async (req, res) => {
+	const user = await User.getUserWithRoles(req.user.id);
+	if (!user) {
+		throw new APIError('User not found', httpStatus.NOT_FOUND);
+	}
+	return res.json({
+		success: true,
+		data: user
+	});
+};
+
+export const updateMe = async (req, res) => {
+	const user = await User.updateUser(req.user.id, req.body);
+	return res.json({
+		success: true,
+		data: user
+	});
+};
+
+export const signout = async (req, res) => {
+	await Token.revokeToken(req.body.refreshToken, config.TOKEN_TYPES.REFRESH);
+	return res.json({
+		success: true,
+		data: 'Signout success'
+	});
+};
+
+export const refreshTokens = async (req, res) => {
+	try {
+		const refreshTokenDoc = await tokenService.verifyToken(req.body.refreshToken, config.TOKEN_TYPES.REFRESH);
+		const user = await User.getUser(refreshTokenDoc.user);
+		if (!user) {
+			throw new Error();
+		}
+		await refreshTokenDoc.remove();
+		const tokens = await tokenService.generateAuthTokens(user);
+		return res.json({
+			success: true,
+			data: {
+				tokens
+			}
+		});
+	} catch (err) {
+		throw new APIError(err.message, httpStatus.UNAUTHORIZED);
+	}
+};
+
+export const sendVerificationEmail = async (req, res) => {
+	const user = await User.getUserByEmail(req.user.email);
+	if (user.confirmed) {
+		throw new APIError('Email verified', httpStatus.BAD_REQUEST);
+	}
+	const verifyEmailToken = await tokenService.generateVerifyEmailToken(req.user);
+	await emailService.sendVerificationEmail(req.user.email, verifyEmailToken);
+	return res.json({
+		success: true,
+		data: 'Send verification email success'
+	});
+};
+
+export const verifyEmail = async (req, res) => {
+	try {
+		const verifyEmailTokenDoc = await tokenService.verifyToken(req.query.token, config.TOKEN_TYPES.VERIFY_EMAIL);
+		const user = await User.getUser(verifyEmailTokenDoc.user);
+		if (!user) {
+			throw new Error();
+		}
+		await Token.deleteMany({ user: user.id, type: config.TOKEN_TYPES.VERIFY_EMAIL });
+		await User.updateUser(user.id, { confirmed: true });
+		return res.json({
+			success: true,
+			data: 'Verify email success'
+		});
+	} catch (err) {
+		throw new APIError('Email verification failed', httpStatus.UNAUTHORIZED);
+	}
+};
+
+export const forgotPassword = async (req, res) => {
+	const resetPasswordToken = await tokenService.generateResetPasswordToken(req.body.email);
+	await emailService.sendResetPasswordEmail(req.body.email, resetPasswordToken);
+	return res.json({
+		success: true,
+		data: 'Send forgot password email success'
+	});
+};
+
+export const resetPassword = async (req, res) => {
+	try {
+		const resetPasswordTokenDoc = await tokenService.verifyToken(req.query.token, config.TOKEN_TYPES.RESET_PASSWORD);
+		const user = await User.getUser(resetPasswordTokenDoc.user);
+		if (!user) {
+			throw new Error();
+		}
+		await Token.deleteMany({ user: user.id, type: config.TOKEN_TYPES.RESET_PASSWORD });
+		await User.updateUser(user.id, { password: req.body.password });
+		return res.json({
+			success: true,
+			data: 'Reset password success'
+		});
+	} catch (err) {
+		throw new APIError('Password reset failed', httpStatus.UNAUTHORIZED);
+	}
+};
+
+export default {
+	signup,
+	signin,
+	current,
+	getMe,
+	updateMe,
+	signout,
+	refreshTokens,
+	sendVerificationEmail,
+	verifyEmail,
+	forgotPassword,
+	resetPassword
+};
+</file>
+
+<file path="backend/src/controllers/roleController.js">
+import _ from 'lodash';
+import APIError from '~/utils/apiError';
+import User from '~/models/userModel';
+import Role from '~/models/roleModel';
+import httpStatus from 'http-status';
+
+export const createRole = async (req, res) => {
+	const role = await Role.createRole(req.body);
+	return res.status(200).json({
+		success: true,
+		data: role
+	});
+};
+
+export const getRole = async (req, res) => {
+	const role = await Role.getRoleById(req.params.roleId);
+	if (!role) {
+		throw new APIError('Role not found', httpStatus.NOT_FOUND);
+	}
+	return res.json({
+		success: true,
+		data: role
+	});
+};
+
+export const updateRole = async (req, res) => {
+	const role = await Role.updateRoleById(req.params.roleId, req.body);
+	return res.json({
+		success: true,
+		data: role
+	});
+};
+
+export const getRoles = async (req, res) => {
+	const filters = _.pick(req.query, ['q']);
+	const options = _.pick(req.query, ['limit', 'page', 'sortBy', 'sortDirection']);
+	const roles = await Role.paginate(
+		options,
+		'permissions',
+		filters.q && {
+			$or: [
+				{
+					name: {
+						$regex: filters.q,
+						$options: 'i'
+					}
+				},
+				{
+					description: {
+						$regex: filters.q,
+						$options: 'i'
+					}
+				}
+			]
+		}
+	);
+	return res.json({
+		success: true,
+		data: roles.results,
+		pagination: {
+			total: roles.totalResults
+		}
+	});
+};
+
+export const deleteRole = async (req, res) => {
+	if (await User.isRoleIdAlreadyExists(req.params.roleId)) {
+		throw new APIError('A role cannot be deleted if associated with users', httpStatus.BAD_REQUEST);
+	}
+	await Role.deleteRoleById(req.params.roleId);
+	return res.json({
+		success: true,
+		data: {}
+	});
+};
+
+export default { createRole, getRole, updateRole, getRoles, deleteRole };
+</file>
+
+<file path="backend/src/controllers/userController.js">
+import _ from 'lodash';
+import User from '~/models/userModel';
+import APIError from '~/utils/apiError';
+import status from 'http-status';
+
+export const getUsers = async (req, res) => {
+    const filters = _.pick(req.query, ['q']);
+    const options = _.pick(req.query, ['limit', 'page', 'sortBy', 'sortDirection']);
+    const users = await User.paginate(
+        options,
+        'roles.permissions',
+        filters.q && {
+            $or: [
+                {
+                    userName: {
+                        $regex: filters.q,
+                        $options: 'i'
+                    }
+                }
+            ]
+        }
+    );
+    return res.json({
+        success: true,
+        data: users.results,
+        pagination: {
+            total: users.totalResults
+        }
+    });
+};
+
+
+
+export const createUser = async (req, res) => {
+	const user = await User.createUser(req.body);
+	return res.status(200).json({
+		success: true,
+		data: user
+	});
+};
+
+export const getUser = async (req, res) => {
+	const user = await User.getUserWithRoles(req.params.userId);
+	if (!user) {
+		throw new APIError('User not found', status.NOT_FOUND);
+	}
+	return res.json({
+		success: true,
+		data: user
+	});
+};
+
+export const updateUser = async (req, res) => {
+	const role = await Role.getRoleByName('Super Administrator');
+	if (req.body.roles && !(await User.isRoleIdAlreadyExists(role.id, req.params.userId)) && !req.body.roles.includes(role.id)) {
+		throw new APIError('Requires at least 1 user as Super Administrator', status.BAD_REQUEST);
+	}
+	const user = await User.updateUserById(req.params.userId, req.body);
+	return res.json({
+		success: true,
+		data: user
+	});
+};
+
+export const deleteUser = async (req, res) => {
+	const role = await Role.getRoleByName('Super Administrator');
+	if (!(await User.isRoleIdAlreadyExists(role.id, req.params.userId))) {
+		throw new APIError('Requires at least 1 user as Super Administrator', status.BAD_REQUEST);
+	}
+	await User.deleteUserById(req.params.userId);
+	return res.json({
+		success: true,
+		data: 'Delete user success'
+	});
+};
+
+export default { createUser, getUser, updateUser, deleteUser, getUsers };
+</file>
+
+<file path="backend/src/middlewares/authenticate.js">
+import passport from 'passport';
+import status from 'http-status';
+import APIError from '~/utils/apiError';
+import Role from '~/models/roleModel';
+
+const verifyCallback = (req, resolve, reject, requiredRights) => async (err, user, info) => {
+    if (err || info || !user) {
+        return reject(new APIError(status[status.UNAUTHORIZED], status.UNAUTHORIZED));
+    }
+    req.user = user;
+    if (requiredRights.length) {
+        const userRights = [];
+        const roles = await Role.find({ _id: { $in: user.roles } }).populate('permissions');
+        roles.forEach((i) => {
+            i.permissions.forEach((j) => {
+                userRights.push(`${j.controller}:${j.action}`);
+            });
+        });
+        const hasRequiredRights = requiredRights.every((r) => userRights.includes(r));
+        if (!hasRequiredRights) {
+            return reject(new APIError('Resource access denied', status.FORBIDDEN));
+        }
+    }
+    return resolve();
+};
+
+const authenticate =
+    (...requiredRights) =>
+        async (req, res, next) => {
+            return new Promise((resolve, reject) => {
+                passport.authenticate('jwt', { session: false }, verifyCallback(req, resolve, reject, requiredRights))(req, res, next);
+            })
+                .then(() => next())
+                .catch((err) => next(err));
+        };
+
+export default authenticate;
+</file>
+
+<file path="backend/src/middlewares/error.js">
+import status from 'http-status';
+import Joi from 'joi';
+import config from '~/config/config';
+import logger from '~/config/logger';
+import APIError from '~/utils/apiError';
+
+// Middleware pour convertir les erreurs
+const converter = (err, req, res, next) => {
+  if (err instanceof Joi.ValidationError) {
+    const errorMessage = err.details.map((d) => ({
+      message: d.message,
+      location: d.path[1],
+      locationType: d.path[0],
+    }));
+
+    const apiError = new APIError(errorMessage, status.BAD_REQUEST);
+    apiError.stack = err.stack;
+    return next(apiError);
+  }
+
+  if (!(err instanceof APIError)) {
+    const statusCode = err.status || status.INTERNAL_SERVER_ERROR;
+    const message = err.message || status[statusCode];
+
+    const apiError = new APIError(message, statusCode, false);
+    apiError.stack = err.stack;
+    apiError.message = [{ message: err.message }];
+    return next(apiError);
+  }
+  err.message = [{ message: err.message }];
+  return next(err);
+};
+
+// Middleware pour les routes non trouvées
+const notFound = (req, res, next) => {
+  const message = 'bad endpoint';
+  next(new APIError([{ message }], status.NOT_FOUND));
+};
+
+// Middleware pour gérer les erreurs globales
+const handler = (err, req, res, next) => {
+  const statusCode = err.status || status.INTERNAL_SERVER_ERROR;
+
+  const message = Array.isArray(err.message)
+    ? err.message
+    : [{ message: err.message || 'Erreur interne du serveur' }];
+
+  logger.error(`[${new Date().toISOString()}] [Handler] Erreur stack :`, err.stack);
+
+  res.status(statusCode).json({
+    status: statusCode,
+    errors: message,
+    ...(config.NODE_ENV === 'development' && { stack: err.stack }),
+  });
+};
+
+export default {
+  converter,
+  notFound,
+  handler,
+};
+</file>
+
+<file path="backend/src/middlewares/rateLimiter.js">
+import rateLimit from 'express-rate-limit';
+import status from 'http-status';
+import APIError from '~/utils/apiError';
+
+const globalRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,
+  handler: (req, res, next) => {
+    next(new APIError('Too many requests, please try again later.', status.TOO_MANY_REQUESTS));
+  }
+});
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10, // Seulement 10 tentatives en 15 minutes
+  handler: (req, res, next) => {
+    next(new APIError('Too many login attempts, please try again later.', status.TOO_MANY_REQUESTS));
+  }
+});
+
+export { globalRateLimiter, loginLimiter };
+</file>
+
+<file path="backend/src/middlewares/validate.js">
+import Joi from 'joi';
+import _ from 'lodash';
+
+const validate = (schema) => (req, res, next) => {
+	const validSchema = _.pick(schema, ['params', 'query', 'body']);
+	const object = _.pick(req, Object.keys(validSchema));
+	const { error, value } = Joi.compile(validSchema)
+		.prefs({ errors: { label: 'path', wrap: { label: false } }, abortEarly: false })
+		.validate(object);
+	if (error) {
+		return next(error);
+	}
+	Object.assign(req, value);
+	return next();
+};
+
+export default validate;
+</file>
+
+<file path="backend/src/models/permissionModel.js">
+import mongoose from 'mongoose';
+import toJSON from './plugins/toJSONPlugin';
+
+const permissionSchema = mongoose.Schema(
+	{
+		controller: {
+			type: String,
+			required: true
+		},
+		action: {
+			type: String,
+			required: true
+		}
+	},
+	{
+		timestamps: true
+	}
+);
+
+permissionSchema.index({ controller: 1, action: 1 }, { unique: true });
+
+permissionSchema.plugin(toJSON);
+
+const Permission = mongoose.model('permissions', permissionSchema);
+
+export default Permission;
+</file>
+
+<file path="backend/src/models/plugins/paginatePlugin.js">
+const paginate = (schema) => {
+	schema.statics.paginate = async function paginateFunc(options, populate, query) {
+		const sortBy = options.sortBy ? options.sortBy : 'createdAt';
+		const sortDirection = options.sortDirection && options.sortDirection === 'asc' ? 'asc' : 'desc';
+		const page = options.page && parseInt(options.page, 10) > 0 ? parseInt(options.page, 10) : 1;
+		const limit = options.limit && parseInt(options.limit, 10) > 0 ? parseInt(options.limit, 10) : 10;
+		const skip = (page - 1) * limit;
+
+		const countPromise = this.countDocuments(query).exec();
+		let docsPromise = this.find(query)
+			.sort({ [sortBy]: sortDirection })
+			.skip(skip)
+			.limit(limit);
+
+		if (populate) {
+			populate.split(' ').forEach((populate) => {
+				docsPromise = docsPromise.populate(
+					populate
+						.split('.')
+						.reverse()
+						.reduce((a, b) => ({ path: b, populate: a }))
+				);
+			});
+		}
+
+		docsPromise = docsPromise.exec();
+
+		const [totalResults, results] = await Promise.all([countPromise, docsPromise]);
+
+		return {
+			results,
+			totalResults
+		};
+	};
+};
+
+export default paginate;
+</file>
+
+<file path="backend/src/models/plugins/toJSONPlugin.js">
+function normalizeId(ret) {
+	if (ret._id && typeof ret._id === 'object' && ret._id.toString) {
+		if (typeof ret.id === 'undefined') {
+			ret.id = ret._id.toString();
+		}
+	}
+	if (typeof ret._id !== 'undefined') {
+		delete ret._id;
+	}
+}
+
+function removePrivatePaths(ret, schema) {
+	for (const path in schema.paths) {
+		if (schema.paths[path].options && schema.paths[path].options.private) {
+			if (typeof ret[path] !== 'undefined') {
+				delete ret[path];
+			}
+		}
+	}
+}
+
+function removeVersion(ret) {
+	if (typeof ret.__v !== 'undefined') {
+		delete ret.__v;
+	}
+}
+
+function toJSON(schema) {
+	// NOTE: this plugin is actually called *after* any schema's
+	// custom toJSON has been defined, so we need to ensure not to
+	// overwrite it. Hence, we remember it here and call it later
+	let transform;
+	if (schema.options.toJSON && schema.options.toJSON.transform) {
+		transform = schema.options.toJSON.transform;
+	}
+
+	// Extend toJSON options
+	schema.options.toJSON = Object.assign(schema.options.toJSON || {}, {
+		transform(doc, ret, options) {
+			// Remove private paths
+			if (schema.options.removePrivatePaths !== false) {
+				removePrivatePaths(ret, schema);
+			}
+
+			// Remove version
+			if (schema.options.removeVersion !== false) {
+				removeVersion(ret);
+			}
+
+			// Normalize ID
+			if (schema.options.normalizeId !== false) {
+				normalizeId(ret);
+			}
+
+			// Call custom transform if present
+			if (transform) {
+				return transform(doc, ret, options);
+			}
+
+			return ret;
+		}
+	});
+}
+
+export default toJSON;
+</file>
+
+<file path="backend/src/models/roleModel.js">
+import mongoose from 'mongoose';
+import APIError from '~/utils/apiError';
+import paginate from './plugins/paginatePlugin';
+import toJSON from './plugins/toJSONPlugin';
+import Permission from './permissionModel';
+import status from 'http-status';
+
+const roleSchema = mongoose.Schema(
+	{
+		name: {
+			type: String,
+			required: true,
+			unique: true
+		},
+		description: {
+			type: String,
+			default: ''
+		},
+		permissions: [
+			{
+				type: mongoose.SchemaTypes.ObjectId,
+				ref: 'permissions'
+			}
+		]
+	},
+	{
+		timestamps: true
+	}
+);
+
+roleSchema.plugin(toJSON);
+roleSchema.plugin(paginate);
+
+class RoleClass {
+	static async isNameAlreadyExists(name, excludeUserId) {
+		return !!(await this.findOne({ name, _id: { $ne: excludeUserId } }));
+	}
+
+	static async getRoleByName(name) {
+		return await this.findOne({ name: name });
+	}
+
+	static async getRoleById(id) {
+		return await this.findById(id);
+	}
+
+	static async createRole(body) {
+		if (await this.isNameAlreadyExists(body.name)) {
+			throw new APIError('Name already exists', status.BAD_REQUEST);
+		}
+		if (body.permissions) {
+			await Promise.all(
+				body.permissions.map(async (pid) => {
+					if (!(await Permission.findById(pid))) {
+						throw new APIError('Permissions not exist', status.BAD_REQUEST);
+					}
+				})
+			);
+		}
+		return await this.create(body);
+	}
+
+	static async updateRoleById(roleId, body) {
+		const role = await this.getRoleById(roleId);
+		if (!role) {
+			throw new APIError('Role not found', status.NOT_FOUND);
+		}
+		if (await this.isNameAlreadyExists(body.name, roleId)) {
+			throw new APIError('Name already exists', status.BAD_REQUEST);
+		}
+		if (body.permissions) {
+			await Promise.all(
+				body.permissions.map(async (pid) => {
+					if (!(await Permission.findById(pid))) {
+						throw new APIError('Permissions not exist', status.BAD_REQUEST);
+					}
+				})
+			);
+		}
+		Object.assign(role, body);
+		return await role.save();
+	}
+
+	static async deleteRoleById(roleId) {
+		const role = await this.getRoleById(roleId);
+		if (!role) {
+			throw new APIError('Role not found', status.NOT_FOUND);
+		}
+		return await role.remove();
+	}
+}
+
+roleSchema.loadClass(RoleClass);
+
+const Role = mongoose.model('roles', roleSchema);
+
+export default Role;
+</file>
+
+<file path="backend/src/models/tokenModel.js">
+import httpStatus from 'http-status';
+import mongoose from 'mongoose';
+import config from '~/config/config';
+import APIError from '~/utils/apiError';
+import toJSON from './plugins/toJSONPlugin';
+
+const tokenSchema = mongoose.Schema(
+	{
+		user: {
+			type: mongoose.SchemaTypes.ObjectId,
+			ref: 'users',
+			required: true
+		},
+		token: {
+			type: String,
+			required: true,
+			index: true
+		},
+		type: {
+			type: String,
+			enum: [config.TOKEN_TYPES.REFRESH, config.TOKEN_TYPES.RESET_PASSWORD, config.TOKEN_TYPES.VERIFY_EMAIL],
+			required: true
+		},
+		blacklisted: {
+			type: Boolean,
+			default: false
+		},
+		expiresAt: {
+			type: Date,
+			required: true
+		}
+	},
+	{
+		timestamps: true
+	}
+);
+
+tokenSchema.plugin(toJSON);
+
+class TokenClass {
+	static async saveToken(token, userId, expires, type, blacklisted = false) {
+		const tokenDoc = await this.create({
+			user: userId,
+			token,
+			type,
+			expiresAt: expires,
+			blacklisted
+		});
+		return tokenDoc;
+	}
+
+	static async revokeToken(token, type) {
+		const tokenDoc = await this.findOne({ token: token, type: type, blacklisted: false });
+		if (!tokenDoc) {
+			throw new APIError('Token not found', httpStatus.BAD_REQUEST);
+		}
+		await tokenDoc.remove();
+	}
+}
+
+tokenSchema.loadClass(TokenClass);
+
+const Token = mongoose.model('tokens', tokenSchema);
+
+export default Token;
+</file>
+
+<file path="backend/src/models/userModel.js">
+import mongoose from 'mongoose';
+import bcrypt from 'bcrypt';
+import paginate from './plugins/paginatePlugin';
+import toJSON from './plugins/toJSONPlugin';
+import APIError from '~/utils/apiError';
+import Role from './roleModel';
+import config from '~/config/config';
+import status from 'http-status';
+
+const userSchema = mongoose.Schema(
+    {
+        userName: {
+            type: String,
+            required: true,
+            unique: true
+        },
+        password: {
+            type: String,
+            required: true,
+            private: true
+        },
+        is_temporary_password: {
+            type: Boolean,
+            default: false
+        },
+        phone_number: {
+            type: String,
+            required: false
+        },
+        avatar: {
+            type: String,
+            default: 'avatar.png'
+        },
+        email: {
+            type: String,
+            required: true,
+            unique: true
+        },
+        roles: [
+            {
+                type: mongoose.SchemaTypes.ObjectId,
+                ref: 'roles'
+            }
+        ],
+        permissions: [
+            {
+                type: mongoose.SchemaTypes.ObjectId,
+                ref: 'permissions'
+            }
+        ],
+        isDeleted: {
+            type: Boolean,
+            default: false
+        },
+    },
+    {
+		timestamps: true,
+		toJSON: { virtuals: true }
+	}
+)
+
+userSchema.plugin(toJSON);
+userSchema.plugin(paginate);
+
+userSchema.virtual('avatarUrl').get(function () {
+    return config.IMAGE_URL + '/' + this.avatar;
+});
+
+class UserClass {
+
+    static async isUserNameAlreadyExists(userName, excludeUserId) {
+        return !!(await this.findOne({ userName, _id: { $ne: excludeUserId } }));
+    }
+
+    static async isEmailAlreadyExists(email, excludeUserId) {
+		return !!(await this.findOne({ email, _id: { $ne: excludeUserId } }));
+	}
+
+    static async isRoleIdAlreadyExists(roleId, excludeUserId) {
+		return !!(await this.findOne({ roles: roleId, _id: { $ne: excludeUserId } }));
+	}
+
+    static async getUser(id) {
+        return await this.findById(id);
+    }
+
+    static async getUserWithRoles(id) {
+        return await this.findOne({ _id: id, isDeleted: false }).populate({
+            path: 'roles',
+            select: 'name description createdAt updatedAt'
+        });
+    }
+
+    static async getUserByUserName(userName) {
+        return await this.findOne({ userName });
+    }
+
+    static async createUser(body) {
+        if (await this.isUserNameAlreadyExists(body.userName)) {
+            throw new APIError('User name already exists', status.BAD_REQUEST);
+        }
+
+        if (await this.isEmailAlreadyExists(body.email)) {
+			throw new APIError('Email already exists', httpStatus.BAD_REQUEST);
+		}
+
+        if (body.roles) {
+            const validRoles = await Role.find({ _id: { $in: body.roles } });
+            if (validRoles.length !== body.roles.length) {
+                throw new APIError('Some roles do not exist', status.BAD_REQUEST);
+            }
+        }
+
+        return await this.create(body);
+    }
+
+    static async updateUser(userId, body) {
+        const user = await this.getUser(userId);
+        if (!user) {
+            throw new APIError('User not found', status.NOT_FOUND);
+        }
+        if (await this.isUserNameAlreadyExists(body.userName, userId)) {
+            throw new APIError('User name already exists', status.BAD_REQUEST);
+        }
+        if (body.roles) {
+            const validRoles = await Role.find({ _id: { $in: body.roles } });
+            if (validRoles.length !== body.roles.length) {
+                throw new APIError('Some roles do not exist', status.BAD_REQUEST);
+            }
+        }
+        Object.assign(user, body);
+        return await user.save();
+    }
+
+    static async deleteUser(userId) {
+        const user = await this.getUser(userId);
+        if (!user) {
+            throw new APIError('User not found', status.NOT_FOUND);
+        }
+        user.isDeleted = true;
+        return await user.save();
+    }
+
+    static async restoreUserById(userId) {
+        const user = await this.getUser(userId);
+        if (!user || !user.isDeleted) {
+            throw new APIError('User not found or not deleted', status.NOT_FOUND);
+        }
+        user.isDeleted = false;
+        return await user.save();
+    }
+
+    async isPasswordMatch(password) {
+        return await bcrypt.compare(password, this.password);
+    }
+}
+
+userSchema.loadClass(UserClass);
+
+userSchema.pre('save', async function (next) {
+    if (this.isModified('password')) {
+        const salt = await bcrypt.genSalt(10);
+        this.password = await bcrypt.hash(this.password, salt);
+    }
+    next();
+});
+
+userSchema.pre(['find', 'findOne', 'findById'], function (next) {
+    if (!this.getFilter().includeDeleted) {
+        this.setQuery({ ...this.getFilter(), isDeleted: false });
+    }
+    next();
+});
+
+const User = mongoose.model('users', userSchema);
+
+export default User;
+</file>
+
+<file path="backend/src/routes/v1/authRoute.js">
+import { Router } from 'express';
+import catchAsync from '~/utils/catchAsync';
+import validate from '~/middlewares/validate';
+import authenticate from '~/middlewares/authenticate';
+import authValidation from '~/validations/authValidation';
+import authController from '~/controllers/authController';
+
+const router = Router();
+
+router.post('/signup', validate(authValidation.signup), catchAsync(authController.signup));
+router.post('/signin', validate(authValidation.signin), catchAsync(authController.signin));
+router.get('/current', authenticate(), catchAsync(authController.current));
+router.get('/me', authenticate(), catchAsync(authController.getMe));
+router.put('/me', authenticate(), validate(authValidation.updateMe), catchAsync(authController.updateMe));
+router.post('/signout', validate(authValidation.signout), catchAsync(authController.signout));
+router.post('/refresh-tokens', validate(authValidation.refreshTokens), catchAsync(authController.refreshTokens));
+router.post('/send-verification-email', authenticate(), catchAsync(authController.sendVerificationEmail));
+router.post('/verify-email', validate(authValidation.verifyEmail), catchAsync(authController.verifyEmail));
+router.post('/forgot-password', validate(authValidation.forgotPassword), catchAsync(authController.forgotPassword));
+router.post('/reset-password', validate(authValidation.resetPassword), catchAsync(authController.resetPassword));
+
+export default router;
+</file>
+
+<file path="backend/src/routes/v1/index.js">
+import { Router } from 'express';
+import userRoute from './userRoute';
+import authRoute from './authRoute';
+import roleRoute from './roleRoute';
+
+const router = Router();
+
+router.use('/user', userRoute);
+router.use('/auth', authRoute);
+router.use('/role', roleRoute);
+
+export default router;
+</file>
+
+<file path="backend/src/routes/v1/roleRoute.js">
+import { Router } from 'express';
+import catchAsync from '~/utils/catchAsync';
+import validate from '~/middlewares/validate';
+import authenticate from '~/middlewares/authenticate';
+import roleValidation from '~/validations/roleValidation';
+import roleController from '~/controllers/roleController';
+
+const router = Router();
+
+router.get('/', authenticate('role:read'), validate(roleValidation.getRoles), catchAsync(roleController.getRoles));
+router.post('/', authenticate('role:create'), validate(roleValidation.createRole), catchAsync(roleController.createRole));
+router.get('/:roleId', authenticate('role:read'), validate(roleValidation.getRole), catchAsync(roleController.getRole));
+router.put('/:roleId', authenticate('role:update'), validate(roleValidation.updateRole), catchAsync(roleController.updateRole));
+router.delete('/:roleId',authenticate('role:delete'),validate(roleValidation.deleteRole),catchAsync(roleController.deleteRole)
+);
+
+export default router;
+</file>
+
+<file path="backend/src/routes/v1/userRoute.js">
+import { Router } from 'express';
+import catchAsync from '~/utils/catchAsync';
+import validate from '~/middlewares/validate';
+import userValidation from '~/validations/userValidation';
+import userController from '~/controllers/userController';
+import authenticate from '~/middlewares/authenticate';
+
+const router = Router();
+
+router.get('/',
+    authenticate('user:read'),
+    validate(userValidation.getUsers),
+    catchAsync(userController.getUsers)
+);
+
+router.get('/:userId',
+    authenticate('user:read'),
+    validate(userValidation.getUser),
+    catchAsync(userController.getUser)
+);
+
+router.post('/',
+    authenticate('user:create'),
+    validate(userValidation.createUser),
+    catchAsync(userController.createUser)
+);
+
+router.put('/:userId',
+    authenticate('user:update'),
+    validate(userValidation.updateUser),
+    catchAsync(userController.updateUser)
+);
+
+router.delete('/:userId',
+    authenticate('user:delete'),
+    validate(userValidation.deleteUser),
+    catchAsync(userController.deleteUser)
+);
+
+export default router;
+</file>
+
+<file path="backend/src/server.js">
+import http from 'http';
+import app from './app'; // Application Express
+import mongooseConnect from './config/mongoose'; // Fonction de connexion MongoDB
+import logger from './config/logger'; // Logger Winston
+import config from './config/config'; // Configuration (PORT, etc.)
+import initialData from './config/initialData'; // Fonction pour initialiser les données
+
+logger.info("🚀 Server is starting...");
+
+// Créer le serveur HTTP
+const server = http.createServer(app);
+
+// Normaliser le port
+const normalizePort = (val) => {
+  const port = parseInt(val, 10);
+  if (isNaN(port)) {
+    return val;
+  }
+  if (port >= 0) {
+    return port;
+  }
+  return false;
+};
+
+const port = normalizePort(config.PORT || '3000');
+app.set('port', port);
+
+// Gestionnaire d'erreurs du serveur
+const errorHandler = (error) => {
+  if (error.syscall !== 'listen') {
+    throw error;
+  }
+  const address = server.address();
+  const bind = typeof address === 'string' ? 'pipe ' + address : 'port: ' + port;
+  switch (error.code) {
+    case 'EACCES':
+      logger.error(`${bind} requires elevated privileges.`);
+      process.exit(1);
+    case 'EADDRINUSE':
+      logger.error(`${bind} is already in use.`);
+      process.exit(1);
+    default:
+      throw error;
+  }
+};
+
+// Gestion des événements du serveur
+server.on('error', errorHandler);
+server.on('listening', () => {
+  const address = server.address();
+  const bind = typeof address === 'string' ? 'pipe ' + address : `port ${port}`;
+  logger.info(`🚀 Server is running on ${bind}`);
+});
+
+mongooseConnect();
+initialData();
+
+server.listen(port);
+</file>
+
+<file path="backend/src/services/emailService/index.js">
+import nodemailer from 'nodemailer';
+import logger from '~/config/logger';
+import template from './template';
+import config from '~/config/config';
+
+export const transport = nodemailer.createTransport({
+	host: config.SMTP_HOST,
+	port: config.SMTP_PORT,
+	secure: true,
+	auth: {
+		user: config.SMTP_USERNAME,
+		pass: config.SMTP_PASSWORD
+	}
+});
+
+if (config.NODE_ENV !== 'test') {
+	transport
+		.verify()
+		.then(() => logger.info('Connected to email server'))
+		.catch(() => logger.warn('Unable to connect to email server'));
+}
+
+export const sendEmail = async (to, subject, html) => {
+	const msg = { from: `${config.APP_NAME} <${config.EMAIL_FROM}>`, to, subject, html };
+	await transport.sendMail(msg);
+};
+
+export const sendResetPasswordEmail = async (to, token) => {
+	const subject = 'Reset password';
+	const resetPasswordUrl = `${config.FRONTEND_URL}/reset-password?token=${token}`;
+	const html = template.resetPassword(resetPasswordUrl, config.APP_NAME);
+	await sendEmail(to, subject, html);
+};
+
+export const sendVerificationEmail = async (to, token) => {
+	const subject = 'Email Verification';
+	const verificationEmailUrl = `${config.FRONTEND_URL}/verify-email?token=${token}`;
+	const html = template.verifyEmail(verificationEmailUrl, config.APP_NAME);
+	await sendEmail(to, subject, html);
+};
+
+export default { sendEmail, sendResetPasswordEmail, sendVerificationEmail };
+</file>
+
+<file path="backend/src/services/emailService/template.js">
+export const verifyEmail = (url, appName) => {
+	return `
+<!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>Verify your email address</title>
+    <style type="text/css" rel="stylesheet" media="all">
+        /* Base ------------------------------ */
+        *:not(br):not(tr):not(html) {
+            font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif;
+            -webkit-box-sizing: border-box;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100% !important;
+            height: 100%;
+            margin: 0;
+            line-height: 1.4;
+            background-color: #F5F7F9;
+            color: #839197;
+            -webkit-text-size-adjust: none;
+        }
+
+        a {
+            color: #414EF9;
+        }
+
+        /* Layout ------------------------------ */
+        .email-wrapper {
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #F5F7F9;
+        }
+
+        .email-content {
+            width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Masthead ----------------------- */
+        .email-masthead {
+            padding: 25px 0;
+            text-align: center;
+        }
+
+        .email-masthead_logo {
+            max-width: 400px;
+            border: 0;
+        }
+
+        .email-masthead_name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #839197;
+            text-decoration: none;
+            text-shadow: 0 1px 0 white;
+        }
+
+        /* Body ------------------------------ */
+        .email-body {
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            border-top: 1px solid #E7EAEC;
+            border-bottom: 1px solid #E7EAEC;
+            background-color: #FFFFFF;
+        }
+
+        .email-body_inner {
+            width: 570px;
+            margin: 0 auto;
+            padding: 0;
+        }
+
+        .email-footer {
+            width: 570px;
+            margin: 0 auto;
+            padding: 0;
+            text-align: center;
+        }
+
+        .email-footer p {
+            color: #839197;
+        }
+
+        .body-action {
+            width: 100%;
+            margin: 30px auto;
+            padding: 0;
+            text-align: center;
+        }
+
+        .body-sub {
+            margin-top: 25px;
+            padding-top: 25px;
+            border-top: 1px solid #E7EAEC;
+        }
+
+        .content-cell {
+            padding: 35px;
+        }
+
+        .align-right {
+            text-align: right;
+        }
+
+        /* Type ------------------------------ */
+        h1 {
+            margin-top: 0;
+            color: #292E31;
+            font-size: 19px;
+            font-weight: bold;
+            text-align: left;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #292E31;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: left;
+        }
+
+        h3 {
+            margin-top: 0;
+            color: #292E31;
+            font-size: 14px;
+            font-weight: bold;
+            text-align: left;
+        }
+
+        p {
+            margin-top: 0;
+            color: #839197;
+            font-size: 16px;
+            line-height: 1.5em;
+            text-align: left;
+        }
+
+        p.sub {
+            font-size: 12px;
+        }
+
+        p.center {
+            text-align: center;
+        }
+
+        /* Buttons ------------------------------ */
+        .button {
+            display: inline-block;
+            width: 200px;
+            background-color: #414EF9;
+            border-radius: 3px;
+            color: #ffffff !important;
+            font-size: 15px;
+            line-height: 45px;
+            text-align: center;
+            text-decoration: none;
+            -webkit-text-size-adjust: none;
+            mso-hide: all;
+        }
+
+        .button--green {
+            background-color: #28DB67;
+        }
+
+        .button--red {
+            background-color: #FF3665;
+        }
+
+        .button--blue {
+            background-color: #414EF9;
+        }
+
+        /*Media Queries ------------------------------ */
+        @media only screen and (max-width: 600px) {
+
+            .email-body_inner,
+            .email-footer {
+                width: 100% !important;
+            }
+        }
+
+        @media only screen and (max-width: 500px) {
+            .button {
+                width: 100% !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <table class="email-wrapper" width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+            <td align="center">
+                <table class="email-content" width="100%" cellpadding="0" cellspacing="0">
+                    <!-- Logo -->
+                    <tr>
+                        <td class="email-masthead">
+                            <a class="email-masthead_name">${appName}</a>
+                        </td>
+                    </tr>
+                    <!-- Email Body -->
+                    <tr>
+                        <td class="email-body" width="100%">
+                            <table class="email-body_inner" align="center" width="570" cellpadding="0" cellspacing="0">
+                                <!-- Body content -->
+                                <tr>
+                                    <td class="content-cell">
+                                        <h1>Verify your email address</h1>
+                                        <p>Thanks for signing up for ${appName}! We're excited to have you as an early user.
+                                        </p>
+                                        <!-- Action -->
+                                        <table class="body-action" align="center" width="100%" cellpadding="0"
+                                            cellspacing="0">
+                                            <tr>
+                                                <td align="center">
+                                                    <div>
+                                                        <a href="${url}" class="button button--blue">Verify
+                                                            Email</a>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <p>Thanks,<br>The ${appName}</p>
+                                        <!-- Sub copy -->
+                                        <table class="body-sub">
+                                            <tr>
+                                                <td>
+                                                    <p class="sub">If you’re having trouble clicking the button, copy
+                                                        and paste the URL below into your web browser.
+                                                    </p>
+                                                    <p class="sub"><a href="${url}">${url}</a></p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <table class="email-footer" align="center" width="570" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td class="content-cell">
+                                        <p class="sub center">
+                                            ${appName} Labs, Inc.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+
+</html>
+`;
+};
+
+export const resetPassword = (url, appName) => {
+	return `
+    <!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>Password Rest</title>
+    <style type="text/css" rel="stylesheet" media="all">
+        /* Base ------------------------------ */
+        *:not(br):not(tr):not(html) {
+            font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif;
+            -webkit-box-sizing: border-box;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100% !important;
+            height: 100%;
+            margin: 0;
+            line-height: 1.4;
+            background-color: #F5F7F9;
+            color: #839197;
+            -webkit-text-size-adjust: none;
+        }
+
+        a {
+            color: #414EF9;
+        }
+
+        /* Layout ------------------------------ */
+        .email-wrapper {
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #F5F7F9;
+        }
+
+        .email-content {
+            width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Masthead ----------------------- */
+        .email-masthead {
+            padding: 25px 0;
+            text-align: center;
+        }
+
+        .email-masthead_logo {
+            max-width: 400px;
+            border: 0;
+        }
+
+        .email-masthead_name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #839197;
+            text-decoration: none;
+            text-shadow: 0 1px 0 white;
+        }
+
+        /* Body ------------------------------ */
+        .email-body {
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            border-top: 1px solid #E7EAEC;
+            border-bottom: 1px solid #E7EAEC;
+            background-color: #FFFFFF;
+        }
+
+        .email-body_inner {
+            width: 570px;
+            margin: 0 auto;
+            padding: 0;
+        }
+
+        .email-footer {
+            width: 570px;
+            margin: 0 auto;
+            padding: 0;
+            text-align: center;
+        }
+
+        .email-footer p {
+            color: #839197;
+        }
+
+        .body-action {
+            width: 100%;
+            margin: 30px auto;
+            padding: 0;
+            text-align: center;
+        }
+
+        .body-sub {
+            margin-top: 25px;
+            padding-top: 25px;
+            border-top: 1px solid #E7EAEC;
+        }
+
+        .content-cell {
+            padding: 35px;
+        }
+
+        .align-right {
+            text-align: right;
+        }
+
+        /* Type ------------------------------ */
+        h1 {
+            margin-top: 0;
+            color: #292E31;
+            font-size: 19px;
+            font-weight: bold;
+            text-align: left;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #292E31;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: left;
+        }
+
+        h3 {
+            margin-top: 0;
+            color: #292E31;
+            font-size: 14px;
+            font-weight: bold;
+            text-align: left;
+        }
+
+        p {
+            margin-top: 0;
+            color: #839197;
+            font-size: 16px;
+            line-height: 1.5em;
+            text-align: left;
+        }
+
+        p.sub {
+            font-size: 12px;
+        }
+
+        p.center {
+            text-align: center;
+        }
+
+        /* Buttons ------------------------------ */
+        .button {
+            display: inline-block;
+            width: 200px;
+            background-color: #414EF9;
+            border-radius: 3px;
+            color: #ffffff !important;
+            font-size: 15px;
+            line-height: 45px;
+            text-align: center;
+            text-decoration: none;
+            -webkit-text-size-adjust: none;
+            mso-hide: all;
+        }
+
+        .button--green {
+            background-color: #28DB67;
+        }
+
+        .button--red {
+            background-color: #FF3665;
+        }
+
+        .button--blue {
+            background-color: #414EF9;
+        }
+
+        /*Media Queries ------------------------------ */
+        @media only screen and (max-width: 600px) {
+
+            .email-body_inner,
+            .email-footer {
+                width: 100% !important;
+            }
+        }
+
+        @media only screen and (max-width: 500px) {
+            .button {
+                width: 100% !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <table class="email-wrapper" width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+            <td align="center">
+                <table class="email-content" width="100%" cellpadding="0" cellspacing="0">
+                    <!-- Logo -->
+                    <tr>
+                        <td class="email-masthead">
+                            <a class="email-masthead_name">${appName}</a>
+                        </td>
+                    </tr>
+                    <!-- Email Body -->
+                    <tr>
+                        <td class="email-body" width="100%">
+                            <table class="email-body_inner" align="center" width="570" cellpadding="0" cellspacing="0">
+                                <!-- Body content -->
+                                <tr>
+                                    <td class="content-cell">
+                                        <h1>Password Reset</h1>
+                                        <p>We received a request to update your password.</p>
+                                        <!-- Action -->
+                                        <table class="body-action" align="center" width="100%" cellpadding="0"
+                                            cellspacing="0">
+                                            <tr>
+                                                <td align="center">
+                                                    <div>
+                                                        <a href="${url}" class="button button--blue">Change
+                                                            Password</a>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <p>Thanks,<br>The ${appName}</p>
+                                        <!-- Sub copy -->
+                                        <table class="body-sub">
+                                            <tr>
+                                                <td>
+                                                    <p class="sub">If you’re having trouble clicking the button, copy
+                                                        and paste the URL below into your web browser.
+                                                    </p>
+                                                    <p class="sub"><a href="${url}">${url}</a></p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <table class="email-footer" align="center" width="570" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td class="content-cell">
+                                        <p class="sub center">
+                                            ${appName} Labs, Inc.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+
+</html>
+`;
+};
+
+export default { verifyEmail, resetPassword };
+</file>
+
+<file path="backend/src/services/jwtService.js">
+import httpStatus from 'http-status';
+import jwt from 'jsonwebtoken';
+import moment from 'moment';
+import APIError from '~/utils/apiError';
+
+export const sign = async (userId, expires, secret, options) => {
+	try {
+		const payload = {
+			sub: userId,
+			iat: moment().unix(),
+			exp: expires.unix()
+		};
+		return jwt.sign(payload, secret, options);
+	} catch (err) {
+		throw new APIError(err.message, httpStatus.UNAUTHORIZED);
+	}
+};
+
+export const verify = async (token, secret, options) => {
+	try {
+		return jwt.verify(token, secret, options);
+	} catch (err) {
+		throw new APIError(err.message, httpStatus.UNAUTHORIZED);
+	}
+};
+
+export default { sign, verify };
+</file>
+
+<file path="backend/src/services/tokenService.js">
+import moment from 'moment';
+import config from '~/config/config';
+import APIError from '~/utils/apiError';
+import User from '~/models/userModel';
+import Token from '~/models/tokenModel';
+import jwtService from './jwtService';
+import httpStatus from 'http-status';
+import { v4 as uuidv4 } from 'uuid';
+
+export const generateRandomToken = async () => {
+	const randomToken = uuidv4();
+	return randomToken;
+};
+
+export const verifyToken = async (token, type) => {
+	const tokenDoc = await Token.findOne({ token, type, blacklisted: false });
+	if (!tokenDoc) {
+		throw new APIError('Token introuvable', httpStatus.UNAUTHORIZED);
+	}
+	if (moment(tokenDoc.expiresAt).isBefore(moment())) {
+		throw new APIError('Token expiré', httpStatus.UNAUTHORIZED);
+	}
+	return tokenDoc;
+};
+
+export const generateAuthTokens = async (user) => {
+	const accessTokenExpires = moment().add(config.JWT_ACCESS_TOKEN_EXPIRATION_MINUTES, 'minutes');
+	const accessToken = await jwtService.sign(user.id, accessTokenExpires, config.JWT_ACCESS_TOKEN_SECRET_PRIVATE, {
+		algorithm: 'RS256'
+	});
+
+	const refreshTokenExpires = moment().add(config.REFRESH_TOKEN_EXPIRATION_DAYS, 'days');
+	const refreshToken = await generateRandomToken();
+	await Token.saveToken(refreshToken, user.id, refreshTokenExpires.format(), config.TOKEN_TYPES.REFRESH);
+
+	return {
+		accessToken: {
+			token: accessToken,
+			expires: accessTokenExpires.format()
+		},
+		refreshToken: {
+			token: refreshToken,
+			expires: refreshTokenExpires.format()
+		}
+	};
+};
+
+export const generateVerifyEmailToken = async (user) => {
+	const expires = moment().add(config.VERIFY_EMAIL_TOKEN_EXPIRATION_MINUTES, 'minutes');
+	const verifyEmailToken = await generateRandomToken();
+	await Token.saveToken(verifyEmailToken, user.id, expires, config.TOKEN_TYPES.VERIFY_EMAIL);
+	return verifyEmailToken;
+};
+
+export const generateResetPasswordToken = async (email) => {
+	const user = await User.getUserByEmail(email);
+	if (!user) {
+		throw new APIError('Aucun utilisateur trouvé avec cet email', httpStatus.NOT_FOUND);
+	}
+	const expires = moment().add(config.RESET_PASSWORD_TOKEN_EXPIRATION_MINUTES, 'minutes');
+	const resetPasswordToken = await generateRandomToken();
+	await Token.saveToken(resetPasswordToken, user.id, expires, config.TOKEN_TYPES.RESET_PASSWORD);
+	return resetPasswordToken;
+};
+
+export default {
+	generateRandomToken,
+	verifyToken,
+	generateAuthTokens,
+	generateVerifyEmailToken,
+	generateResetPasswordToken
+};
+</file>
+
+<file path="backend/src/utils/apiError.js">
+class APIError extends Error {
+	constructor(message, status = 500, isOperational = true) {
+	  super();
+	  this.name = this.constructor.name;
+  
+	  // Si le message est une chaîne, convertis-le en tableau
+	  this.message = Array.isArray(message)
+		? message
+		: [{ message }];
+  
+	  this.status = status;
+	  this.isOperational = isOperational;
+	  Error.captureStackTrace(this, this.constructor);
+	}
+  }
+  
+  module.exports = APIError;
+</file>
+
+<file path="backend/src/utils/catchAsync.js">
+const catchAsync = (fn) => (req, res, next) => {
+	Promise.resolve(fn(req, res, next)).catch((err) => next(err));
+};
+
+export default catchAsync;
+</file>
+
+<file path="backend/src/validations/authValidation.js">
+import Joi from 'joi';
+
+export const signup = {
+	body: Joi.object().keys({
+		userName: Joi.string().alphanum().min(6).max(66).required(),
+		email: Joi.string().email().required(),
+		password: Joi.string().trim().min(6).max(666).required()
+	})
+};
+
+export const signin = {
+	body: Joi.object().keys({
+		userName: Joi.string().required(),
+		password: Joi.string().required()
+	})
+};
+
+export const signout = {
+	body: Joi.object().keys({
+		refreshToken: Joi.string().required()
+	})
+};
+
+export const refreshTokens = {
+	body: Joi.object().keys({
+		refreshToken: Joi.string().required()
+	})
+};
+
+export const forgotPassword = {
+	body: Joi.object().keys({
+		email: Joi.string().email().required()
+	})
+};
+
+export const resetPassword = {
+	query: Joi.object().keys({
+		token: Joi.string().required()
+	}),
+	body: Joi.object().keys({
+		password: Joi.string().trim().min(6).max(666).required()
+	})
+};
+
+export const verifyEmail = {
+	query: Joi.object().keys({
+		token: Joi.string().required()
+	})
+};
+
+export const updateMe = {
+	body: Joi.object().keys({
+		firstName: Joi.string().trim().min(2).max(66),
+		lastName: Joi.string().trim().min(2).max(66),
+		userName: Joi.string().alphanum().min(6).max(66),
+		email: Joi.string().email(),
+		password: Joi.string().trim().min(6).max(666),
+		avatar: Joi.string().max(666)
+	})
+};
+
+export default {
+	signup,
+	signin,
+	updateMe,
+	signout,
+	refreshTokens,
+	verifyEmail,
+	forgotPassword,
+	resetPassword
+};
+</file>
+
+<file path="backend/src/validations/customValidation.js">
+export const mongoId = (value, helpers) => {
+	if (!value.match(/^(0x|0h)?[0-9A-F]{24}$/i)) {
+		return helpers.message('{{#label}} must be a valid mongo id');
+	}
+	return value;
+};
+</file>
+
+<file path="backend/src/validations/roleValidation.js">
+import Joi from 'joi';
+import { mongoId } from './customValidation';
+
+export const createRole = {
+	body: Joi.object().keys({
+		name: Joi.string().trim().min(2).max(66).required(),
+		description: Joi.string().min(2).max(666).allow(''),
+		permissions: Joi.array().items(Joi.string().custom(mongoId)).unique()
+	})
+};
+
+export const updateRole = {
+	params: Joi.object().keys({
+		roleId: Joi.string().custom(mongoId).required()
+	}),
+	body: Joi.object().keys({
+		name: Joi.string().trim().min(2).max(66),
+		description: Joi.string().min(2).max(666).allow(''),
+		permissions: Joi.array().items(Joi.string().custom(mongoId)).unique()
+	})
+};
+
+export const deleteRole = {
+	params: Joi.object().keys({
+		roleId: Joi.string().custom(mongoId)
+	})
+};
+
+export const getRoles = {
+	query: Joi.object().keys({
+		q: Joi.string(),
+		sortBy: Joi.string(),
+		sortDirection: Joi.string(),
+		limit: Joi.number().integer(),
+		page: Joi.number().integer()
+	})
+};
+
+export const getRole = {
+	params: Joi.object().keys({
+		roleId: Joi.string().custom(mongoId)
+	})
+};
+
+export default { createRole, getRole, updateRole, getRoles, deleteRole };
+</file>
+
+<file path="backend/src/validations/userValidation.js">
+import Joi from 'joi';
+
+export const createUser = {
+    body: Joi.object().keys({
+        userName: Joi.string().required(),
+        password: Joi.string().required().min(6),
+        is_temporary_password: Joi.boolean(),
+        avatar: Joi.string().optional(),
+        roles: Joi.array().items(Joi.string()).default([]),
+        permissions: Joi.array().items(
+            Joi.object({
+                model: Joi.string().required(),
+                action: Joi.string().required()
+            })
+        ),
+        isDeleted: Joi.boolean(),
+    }),
+};
+
+export const getUser = {
+    params: Joi.object().keys({
+        userId: Joi.string().required(),
+    }),
+};
+
+
+export const updateUser = {
+    params: Joi.object().keys({
+        userId: Joi.string().required(),
+    }),
+    body: Joi.object().keys({
+        firstname: Joi.string(),
+        lastname: Joi.string(),
+        username: Joi.string(),
+        password: Joi.string().min(6),
+        phone_number: Joi.string(),
+        is_temporary_password: Joi.boolean(),
+        id_address: Joi.string().optional(),
+        avatar: Joi.string().optional(),
+        role: Joi.array().items(Joi.string()),
+        permissions: Joi.array().items(
+            Joi.object({
+                model: Joi.string().required(),
+                action: Joi.string().required()
+            })
+        ),
+        isDeleted: Joi.boolean(),
+    }).min(1),
+};
+
+export const getUsers = {
+    query: Joi.object().keys({
+        page: Joi.number().integer().min(1).default(1),
+        limit: Joi.number().integer().min(1).default(10),
+        search: Joi.string(),
+        sortBy: Joi.string(),
+        order: Joi.string().valid('asc', 'desc'),
+    }),
+};
+
+
+export const deleteUser = {
+    params: Joi.object().keys({
+        userId: Joi.string().required(),
+    }),
+};
+
+export default { createUser, getUser, updateUser, deleteUser };
+</file>
+
+<file path="frontend/.gitignore">
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+</file>
+
+<file path="frontend/index.html">
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vite App</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
+</file>
+
+<file path="frontend/package.json">
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^6.3.1"
+  }
+}
+</file>
+
+<file path="frontend/public/vite.svg">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="31.88" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 257"><defs><linearGradient id="IconifyId1813088fe1fbc01fb466" x1="-.828%" x2="57.636%" y1="7.652%" y2="78.411%"><stop offset="0%" stop-color="#41D1FF"></stop><stop offset="100%" stop-color="#BD34FE"></stop></linearGradient><linearGradient id="IconifyId1813088fe1fbc01fb467" x1="43.376%" x2="50.316%" y1="2.242%" y2="89.03%"><stop offset="0%" stop-color="#FFEA83"></stop><stop offset="8.333%" stop-color="#FFDD35"></stop><stop offset="100%" stop-color="#FFA800"></stop></linearGradient></defs><path fill="url(#IconifyId1813088fe1fbc01fb466)" d="M255.153 37.938L134.897 252.976c-2.483 4.44-8.862 4.466-11.382.048L.875 37.958c-2.746-4.814 1.371-10.646 6.827-9.67l120.385 21.517a6.537 6.537 0 0 0 2.322-.004l117.867-21.483c5.438-.991 9.574 4.796 6.877 9.62Z"></path><path fill="url(#IconifyId1813088fe1fbc01fb467)" d="M185.432.063L96.44 17.501a3.268 3.268 0 0 0-2.634 3.014l-5.474 92.456a3.268 3.268 0 0 0 3.997 3.378l24.777-5.718c2.318-.535 4.413 1.507 3.936 3.838l-7.361 36.047c-.495 2.426 1.782 4.5 4.151 3.78l15.304-4.649c2.372-.72 4.652 1.36 4.15 3.788l-11.698 56.621c-.732 3.542 3.979 5.473 5.943 2.437l1.313-2.028l72.516-144.72c1.215-2.423-.88-5.186-3.54-4.672l-25.505 4.922c-2.396.462-4.435-1.77-3.759-4.114l16.646-57.705c.677-2.35-1.37-4.583-3.769-4.113Z"></path></svg>
+</file>
+
+<file path="frontend/src/counter.js">
+export function setupCounter(element) {
+  let counter = 0
+  const setCounter = (count) => {
+    counter = count
+    element.innerHTML = `count is ${counter}`
+  }
+  element.addEventListener('click', () => setCounter(counter + 1))
+  setCounter(0)
+}
+</file>
+
+<file path="frontend/src/javascript.svg">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="32" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="#F7DF1E" d="M0 0h256v256H0V0Z"></path><path d="m67.312 213.932l19.59-11.856c3.78 6.701 7.218 12.371 15.465 12.371c7.905 0 12.89-3.092 12.89-15.12v-81.798h24.057v82.138c0 24.917-14.606 36.259-35.916 36.259c-19.245 0-30.416-9.967-36.087-21.996m85.07-2.576l19.588-11.341c5.157 8.421 11.859 14.607 23.715 14.607c9.969 0 16.325-4.984 16.325-11.858c0-8.248-6.53-11.17-17.528-15.98l-6.013-2.58c-17.357-7.387-28.87-16.667-28.87-36.257c0-18.044 13.747-31.792 35.228-31.792c15.294 0 26.292 5.328 34.196 19.247l-18.732 12.03c-4.125-7.389-8.591-10.31-15.465-10.31c-7.046 0-11.514 4.468-11.514 10.31c0 7.217 4.468 10.14 14.778 14.608l6.014 2.577c20.45 8.765 31.963 17.7 31.963 37.804c0 21.654-17.012 33.51-39.867 33.51c-22.339 0-36.774-10.654-43.819-24.574"></path></svg>
+</file>
+
+<file path="frontend/src/main.js">
+import './style.css'
+import javascriptLogo from './javascript.svg'
+import viteLogo from '/vite.svg'
+import { setupCounter } from './counter.js'
+
+document.querySelector('#app').innerHTML = `
+  <div>
+    <a href="https://vite.dev" target="_blank">
+      <img src="${viteLogo}" class="logo" alt="Vite logo" />
+    </a>
+    <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript" target="_blank">
+      <img src="${javascriptLogo}" class="logo vanilla" alt="JavaScript logo" />
+    </a>
+    <h1>Hello Vite!</h1>
+    <div class="card">
+      <button id="counter" type="button"></button>
+    </div>
+    <p class="read-the-docs">
+      Click on the Vite logo to learn more
+    </p>
+  </div>
+`
+
+setupCounter(document.querySelector('#counter'))
+</file>
+
+<file path="frontend/src/style.css">
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+a:hover {
+  color: #535bf2;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+#app {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.vanilla:hover {
+  filter: drop-shadow(0 0 2em #f7df1eaa);
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+button:hover {
+  border-color: #646cff;
+}
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+  a:hover {
+    color: #747bff;
+  }
+  button {
+    background-color: #f9f9f9;
+  }
+}
+</file>
+
+<file path="readme.md">
+init
+</file>
+
+</files>
