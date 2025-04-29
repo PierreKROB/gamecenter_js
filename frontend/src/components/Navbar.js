@@ -80,7 +80,6 @@ class Navbar {
         <div class="nav-links">
           ${isAuthenticated 
             ? `
-                <a href="#/tic-tac-toe" class="nav-link">Morpion</a>
                 <button id="nav-logout-btn" class="nav-link" style="background: none; border: none; color: white; cursor: pointer;">Déconnexion</button>
               `
             : `
