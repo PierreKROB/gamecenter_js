@@ -2,7 +2,7 @@ import _ from 'lodash';
 import APIError from '~/utils/apiError';
 import User from '~/models/userModel';
 import Role from '~/models/roleModel';
-import httpStatus from 'http-status';
+import status from 'http-status';
 
 export const createRole = async (req, res) => {
 	const role = await Role.createRole(req.body);
@@ -15,7 +15,7 @@ export const createRole = async (req, res) => {
 export const getRole = async (req, res) => {
 	const role = await Role.getRoleById(req.params.roleId);
 	if (!role) {
-		throw new APIError('Role not found', httpStatus.NOT_FOUND);
+		throw new APIError('Role not found', status.NOT_FOUND);
 	}
 	return res.json({
 		success: true,
@@ -65,7 +65,7 @@ export const getRoles = async (req, res) => {
 
 export const deleteRole = async (req, res) => {
 	if (await User.isRoleIdAlreadyExists(req.params.roleId)) {
-		throw new APIError('A role cannot be deleted if associated with users', httpStatus.BAD_REQUEST);
+		throw new APIError('A role cannot be deleted if associated with users', status.BAD_REQUEST);
 	}
 	await Role.deleteRoleById(req.params.roleId);
 	return res.json({

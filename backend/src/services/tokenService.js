@@ -4,7 +4,7 @@ import APIError from '~/utils/apiError';
 import User from '~/models/userModel';
 import Token from '~/models/tokenModel';
 import jwtService from './jwtService';
-import httpStatus from 'http-status';
+import status from 'http-status';
 import { v4 as uuidv4 } from 'uuid';
 
 export const generateRandomToken = async () => {
@@ -15,10 +15,10 @@ export const generateRandomToken = async () => {
 export const verifyToken = async (token, type) => {
 	const tokenDoc = await Token.findOne({ token, type, blacklisted: false });
 	if (!tokenDoc) {
-		throw new APIError('Token introuvable', httpStatus.UNAUTHORIZED);
+		throw new APIError('Token introuvable', status.UNAUTHORIZED);
 	}
 	if (moment(tokenDoc.expiresAt).isBefore(moment())) {
-		throw new APIError('Token expiré', httpStatus.UNAUTHORIZED);
+		throw new APIError('Token expiré', status.UNAUTHORIZED);
 	}
 	return tokenDoc;
 };
@@ -55,7 +55,7 @@ export const generateVerifyEmailToken = async (user) => {
 export const generateResetPasswordToken = async (email) => {
 	const user = await User.getUserByEmail(email);
 	if (!user) {
-		throw new APIError('Aucun utilisateur trouvé avec cet email', httpStatus.NOT_FOUND);
+		throw new APIError('Aucun utilisateur trouvé avec cet email', status.NOT_FOUND);
 	}
 	const expires = moment().add(config.RESET_PASSWORD_TOKEN_EXPIRATION_MINUTES, 'minutes');
 	const resetPasswordToken = await generateRandomToken();

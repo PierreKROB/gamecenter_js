@@ -3,7 +3,7 @@ import tokenService from '~/services/tokenService';
 import emailService from '~/services/emailService';
 import User from '~/models/userModel';
 import config from '~/config/config';
-import httpStatus from 'http-status';
+import status from 'http-status';
 import Token from '~/models/tokenModel';
 import Role from '~/models/roleModel';
 
@@ -21,7 +21,7 @@ export const signup = async (req, res) => {
 export const signin = async (req, res) => {
 	const user = await User.getUserByUserName(req.body.userName);
 	if (!user || !(await user.isPasswordMatch(req.body.password))) {
-		throw new APIError('Incorrect user name or password', httpStatus.BAD_REQUEST);
+		throw new APIError('Incorrect user name or password', status.BAD_REQUEST);
 	}
 	const tokens = await tokenService.generateAuthTokens(user);
 	return res.json({
@@ -33,7 +33,7 @@ export const signin = async (req, res) => {
 export const current = async (req, res) => {
 	const user = await User.getUser(req.user.id);
 	if (!user) {
-		throw new APIError('User not found', httpStatus.NOT_FOUND);
+		throw new APIError('User not found', status.NOT_FOUND);
 	}
 	return res.json({
 		success: true,
@@ -49,7 +49,7 @@ export const current = async (req, res) => {
 export const getMe = async (req, res) => {
 	const user = await User.getUserWithRoles(req.user.id);
 	if (!user) {
-		throw new APIError('User not found', httpStatus.NOT_FOUND);
+		throw new APIError('User not found', status.NOT_FOUND);
 	}
 	return res.json({
 		success: true,
@@ -89,14 +89,14 @@ export const refreshTokens = async (req, res) => {
 			}
 		});
 	} catch (err) {
-		throw new APIError(err.message, httpStatus.UNAUTHORIZED);
+		throw new APIError(err.message, status.UNAUTHORIZED);
 	}
 };
 
 export const sendVerificationEmail = async (req, res) => {
 	const user = await User.getUserByEmail(req.user.email);
 	if (user.confirmed) {
-		throw new APIError('Email verified', httpStatus.BAD_REQUEST);
+		throw new APIError('Email verified', status.BAD_REQUEST);
 	}
 	const verifyEmailToken = await tokenService.generateVerifyEmailToken(req.user);
 	await emailService.sendVerificationEmail(req.user.email, verifyEmailToken);
@@ -120,7 +120,7 @@ export const verifyEmail = async (req, res) => {
 			data: 'Verify email success'
 		});
 	} catch (err) {
-		throw new APIError('Email verification failed', httpStatus.UNAUTHORIZED);
+		throw new APIError('Email verification failed', status.UNAUTHORIZED);
 	}
 };
 
@@ -147,7 +147,7 @@ export const resetPassword = async (req, res) => {
 			data: 'Reset password success'
 		});
 	} catch (err) {
-		throw new APIError('Password reset failed', httpStatus.UNAUTHORIZED);
+		throw new APIError('Password reset failed', status.UNAUTHORIZED);
 	}
 };
 

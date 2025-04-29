@@ -1,4 +1,4 @@
-import httpStatus from 'http-status';
+import status from 'http-status';
 import mongoose from 'mongoose';
 import config from '~/config/config';
 import APIError from '~/utils/apiError';
@@ -52,7 +52,7 @@ class TokenClass {
 	static async revokeToken(token, type) {
 		const tokenDoc = await this.findOne({ token: token, type: type, blacklisted: false });
 		if (!tokenDoc) {
-			throw new APIError('Token not found', httpStatus.BAD_REQUEST);
+			throw new APIError('Token not found', status.BAD_REQUEST);
 		}
 		await tokenDoc.remove();
 	}

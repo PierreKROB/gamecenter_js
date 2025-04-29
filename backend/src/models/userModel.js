@@ -101,7 +101,7 @@ class UserClass {
         }
 
         if (await this.isEmailAlreadyExists(body.email)) {
-			throw new APIError('Email already exists', httpStatus.BAD_REQUEST);
+			throw new APIError('Email already exists', status.BAD_REQUEST);
 		}
 
         if (body.roles) {
