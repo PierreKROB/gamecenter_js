@@ -20,7 +20,7 @@ class NotFoundPage {
         <a href="#/" class="auth-link">Retour à l'accueil</a>
       </div>
     `;
-    
+
     return this.container;
   }
 }

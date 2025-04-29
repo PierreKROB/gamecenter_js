@@ -61,6 +61,7 @@ backend/src/config/passport.js
 backend/src/controllers/authController.js
 backend/src/controllers/roleController.js
 backend/src/controllers/userController.js
+backend/src/controllers/walletController.js
 backend/src/middlewares/authenticate.js
 backend/src/middlewares/error.js
 backend/src/middlewares/rateLimiter.js
@@ -71,36 +72,3860 @@ backend/src/models/plugins/toJSONPlugin.js
 backend/src/models/roleModel.js
 backend/src/models/tokenModel.js
 backend/src/models/userModel.js
+backend/src/models/walletModel.js
 backend/src/routes/v1/authRoute.js
 backend/src/routes/v1/index.js
 backend/src/routes/v1/roleRoute.js
 backend/src/routes/v1/userRoute.js
+backend/src/routes/v1/walletRoute.js
 backend/src/server.js
 backend/src/services/emailService/index.js
 backend/src/services/emailService/template.js
 backend/src/services/jwtService.js
 backend/src/services/tokenService.js
+backend/src/socket/games/index.js
+backend/src/socket/games/ticTacToe.js
+backend/src/socket/index.js
+backend/src/socket/middleware/auth.js
 backend/src/utils/apiError.js
 backend/src/utils/catchAsync.js
 backend/src/validations/authValidation.js
 backend/src/validations/customValidation.js
 backend/src/validations/roleValidation.js
 backend/src/validations/userValidation.js
+backend/src/validations/walletValidation.js
 frontend/.gitignore
+frontend/index.html
 frontend/package.json
+frontend/src/components/Navbar.js
 frontend/src/main.js
+frontend/src/pages/HomePage.js
+frontend/src/pages/LoginPage.js
+frontend/src/pages/NotFoundPage.js
+frontend/src/pages/RegisterPage.js
+frontend/src/pages/TicTacToePage.js
+frontend/src/services/api.js
+frontend/src/services/authService.js
+frontend/src/services/socket/BaseSocketService.js
+frontend/src/services/socket/GamesSocketService.js
+frontend/src/services/socket/index.js
+frontend/src/services/socket/TicTacToeService.js
+frontend/src/services/socketService.js
+frontend/src/services/walletService.js
+frontend/src/styles/auth.css
+frontend/src/styles/base.css
+frontend/src/styles/home.css
+frontend/src/styles/index.css
+frontend/src/styles/navbar.css
+frontend/src/styles/ticTacToe.css
+frontend/src/styles/welcome.css
+frontend/src/utils/authGuard.js
+frontend/src/utils/router.js
 readme.md
 </directory_structure>
 
 <files>
 This section contains the contents of the repository's files.
 
-<file path=".repomix.yml">
-name: gamecenter_js
-exclude:
-  - node_modules/**
-  - dist/**
-  - .git/**
+<file path="backend/src/controllers/walletController.js">
+import Wallet from '~/models/walletModel';
+import APIError from '~/utils/apiError';
+import status from 'http-status';
+
+/**
+ * Obtenir le portefeuille de l'utilisateur courant
+ * @param {Object} req - Requête Express
+ * @param {Object} res - Réponse Express
+ */
+export const getMyWallet = async (req, res) => {
+    const wallet = await Wallet.getOrCreateWallet(req.user.id);
+    
+    return res.json({
+        success: true,
+        data: {
+            balance: wallet.balance,
+            userId: wallet.user
+        }
+    });
+};
+
+/**
+ * Obtenir l'historique des transactions de l'utilisateur courant
+ * @param {Object} req - Requête Express
+ * @param {Object} res - Réponse Express
+ */
+export const getMyTransactions = async (req, res) => {
+    const options = {
+        page: req.query.page ? parseInt(req.query.page) : 1,
+        limit: req.query.limit ? parseInt(req.query.limit) : 10
+    };
+    
+    const result = await Wallet.getTransactionHistory(req.user.id, options);
+    
+    return res.json({
+        success: true,
+        data: result.transactions,
+        pagination: {
+            total: result.total,
+            page: result.page,
+            limit: result.limit
+        }
+    });
+};
+
+/**
+ * Ajouter des fonds au portefeuille (admin uniquement)
+ * @param {Object} req - Requête Express
+ * @param {Object} res - Réponse Express
+ */
+export const addFunds = async (req, res) => {
+    const { userId, amount, description } = req.body;
+    
+    const wallet = await Wallet.addFunds(userId, amount, description);
+    
+    return res.json({
+        success: true,
+        data: {
+            balance: wallet.balance,
+            transaction: wallet.transactions[wallet.transactions.length - 1]
+        }
+    });
+};
+
+/**
+ * Retirer des fonds du portefeuille (admin uniquement)
+ * @param {Object} req - Requête Express
+ * @param {Object} res - Réponse Express
+ */
+export const removeFunds = async (req, res) => {
+    const { userId, amount, description } = req.body;
+    
+    const wallet = await Wallet.removeFunds(userId, amount, description);
+    
+    return res.json({
+        success: true,
+        data: {
+            balance: wallet.balance,
+            transaction: wallet.transactions[wallet.transactions.length - 1]
+        }
+    });
+};
+
+/**
+ * Vérifier si l'utilisateur peut placer un pari
+ * @param {Object} req - Requête Express
+ * @param {Object} res - Réponse Express
+ */
+export const canPlaceBet = async (req, res) => {
+    const { amount } = req.body;
+    
+    if (!amount || amount <= 0) {
+        throw new APIError('Le montant doit être positif', status.BAD_REQUEST);
+    }
+    
+    const hasFunds = await Wallet.hasSufficientFunds(req.user.id, amount);
+    
+    return res.json({
+        success: true,
+        data: {
+            canPlaceBet: hasFunds,
+            amount
+        }
+    });
+};
+
+/**
+ * Placer un pari pour une partie
+ * @param {Object} req - Requête Express
+ * @param {Object} res - Réponse Express
+ */
+export const placeBet = async (req, res) => {
+    const { gameId, amount, gameType } = req.body;
+    
+    if (!gameId) {
+        throw new APIError('ID de jeu manquant', status.BAD_REQUEST);
+    }
+    
+    if (!amount || amount <= 0) {
+        throw new APIError('Le montant doit être positif', status.BAD_REQUEST);
+    }
+    
+    if (!gameType) {
+        throw new APIError('Type de jeu manquant', status.BAD_REQUEST);
+    }
+    
+    const result = await Wallet.removeFunds(
+        req.user.id,
+        amount,
+        `Mise pour une partie de ${gameType}`,
+        gameId,
+        'bet'
+    );
+    
+    return res.json({
+        success: true,
+        data: {
+            gameId,
+            amount,
+            newBalance: result.balance
+        }
+    });
+};
+
+/**
+ * Récupérer ses gains après une victoire
+ * @param {Object} req - Requête Express
+ * @param {Object} res - Réponse Express
+ */
+export const claimWinnings = async (req, res) => {
+    const { gameId, amount, gameType } = req.body;
+    
+    if (!gameId) {
+        throw new APIError('ID de jeu manquant', status.BAD_REQUEST);
+    }
+    
+    if (!amount || amount <= 0) {
+        throw new APIError('Le montant doit être positif', status.BAD_REQUEST);
+    }
+    
+    if (!gameType) {
+        throw new APIError('Type de jeu manquant', status.BAD_REQUEST);
+    }
+    
+    const result = await Wallet.addFunds(
+        req.user.id,
+        amount,
+        `Gains d'une partie de ${gameType}`,
+        gameId,
+        'win'
+    );
+    
+    return res.json({
+        success: true,
+        data: {
+            gameId,
+            amount,
+            newBalance: result.balance
+        }
+    });
+};
+
+/**
+ * Collecter un bonus quotidien
+ * @param {Object} req - Requête Express
+ * @param {Object} res - Réponse Express
+ */
+export const collectDailyBonus = async (req, res) => {
+    // Vérifier si l'utilisateur a déjà collecté le bonus aujourd'hui
+    const wallet = await Wallet.getOrCreateWallet(req.user.id);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const hasCollectedToday = wallet.transactions.some(t => 
+        t.type === 'bonus' && 
+        t.description.includes('Bonus quotidien') &&
+        new Date(t.createdAt) >= today
+    );
+    
+    if (hasCollectedToday) {
+        throw new APIError('Vous avez déjà collecté votre bonus quotidien aujourd\'hui', status.BAD_REQUEST);
+    }
+    
+    // Montant aléatoire entre 50 et 150
+    const amount = Math.floor(Math.random() * 101) + 50;
+    
+    const result = await Wallet.addFunds(
+        req.user.id,
+        amount,
+        `Bonus quotidien du ${new Date().toLocaleDateString()}`,
+        null,
+        'bonus'
+    );
+    
+    return res.json({
+        success: true,
+        data: {
+            amount,
+            newBalance: result.balance,
+            message: `Vous avez reçu ${amount} GameCoins!`
+        }
+    });
+};
+
+export default {
+    getMyWallet,
+    getMyTransactions,
+    addFunds,
+    removeFunds,
+    canPlaceBet,
+    placeBet,
+    claimWinnings,
+    collectDailyBonus
+};
+</file>
+
+<file path="backend/src/models/walletModel.js">
+import mongoose from 'mongoose';
+import toJSON from './plugins/toJSONPlugin';
+import paginate from './plugins/paginatePlugin';
+import APIError from '~/utils/apiError';
+import status from 'http-status';
+
+const walletSchema = mongoose.Schema(
+    {
+        user: {
+            type: mongoose.SchemaTypes.ObjectId,
+            ref: 'users',
+            required: true,
+            unique: true
+        },
+        balance: {
+            type: Number,
+            required: true,
+            default: 1000, // Chaque utilisateur commence avec 1000 GameCoins
+            min: 0
+        },
+        transactions: [{
+            type: {
+                type: String,
+                enum: ['deposit', 'withdrawal', 'bet', 'win', 'bonus', 'transfer'],
+                required: true
+            },
+            amount: {
+                type: Number,
+                required: true
+            },
+            description: {
+                type: String,
+                required: true
+            },
+            gameId: {
+                type: String,
+                default: null
+            },
+            createdAt: {
+                type: Date,
+                default: Date.now
+            }
+        }]
+    },
+    {
+        timestamps: true
+    }
+);
+
+walletSchema.plugin(toJSON);
+walletSchema.plugin(paginate);
+
+class WalletClass {
+    /**
+     * Obtenir le portefeuille d'un utilisateur, en le créant si nécessaire
+     * @param {string} userId - ID de l'utilisateur
+     * @returns {Promise<Wallet>} - Portefeuille de l'utilisateur
+     */
+    static async getOrCreateWallet(userId) {
+        let wallet = await this.findOne({ user: userId });
+        
+        if (!wallet) {
+            // Créer un nouveau portefeuille avec le solde par défaut
+            wallet = await this.create({
+                user: userId,
+                balance: 1000,
+                transactions: [{
+                    type: 'deposit',
+                    amount: 1000,
+                    description: 'Initial balance'
+                }]
+            });
+        }
+        
+        return wallet;
+    }
+
+    /**
+     * Ajouter des fonds au portefeuille
+     * @param {string} userId - ID de l'utilisateur
+     * @param {number} amount - Montant à ajouter
+     * @param {string} description - Description de la transaction
+     * @param {string} [gameId] - ID du jeu (optionnel)
+     * @param {string} [type] - Type de transaction
+     * @returns {Promise<Wallet>} - Portefeuille mis à jour
+     */
+    static async addFunds(userId, amount, description, gameId = null, type = 'deposit') {
+        if (amount <= 0) {
+            throw new APIError('Le montant doit être positif', status.BAD_REQUEST);
+        }
+
+        const wallet = await this.getOrCreateWallet(userId);
+        
+        // Ajouter la transaction
+        wallet.transactions.push({
+            type,
+            amount,
+            description,
+            gameId,
+            createdAt: new Date()
+        });
+        
+        // Mettre à jour le solde
+        wallet.balance += amount;
+        
+        await wallet.save();
+        return wallet;
+    }
+
+    /**
+     * Retirer des fonds du portefeuille
+     * @param {string} userId - ID de l'utilisateur
+     * @param {number} amount - Montant à retirer
+     * @param {string} description - Description de la transaction
+     * @param {string} [gameId] - ID du jeu (optionnel)
+     * @param {string} [type] - Type de transaction
+     * @returns {Promise<Wallet>} - Portefeuille mis à jour
+     */
+    static async removeFunds(userId, amount, description, gameId = null, type = 'withdrawal') {
+        if (amount <= 0) {
+            throw new APIError('Le montant doit être positif', status.BAD_REQUEST);
+        }
+
+        const wallet = await this.getOrCreateWallet(userId);
+        
+        // Vérifier si le solde est suffisant
+        if (wallet.balance < amount) {
+            throw new APIError('Solde insuffisant', status.BAD_REQUEST);
+        }
+        
+        // Ajouter la transaction
+        wallet.transactions.push({
+            type,
+            amount: -amount, // Montant négatif pour les retraits
+            description,
+            gameId,
+            createdAt: new Date()
+        });
+        
+        // Mettre à jour le solde
+        wallet.balance -= amount;
+        
+        await wallet.save();
+        return wallet;
+    }
+
+    /**
+     * Vérifier si l'utilisateur a suffisamment de fonds
+     * @param {string} userId - ID de l'utilisateur
+     * @param {number} amount - Montant à vérifier
+     * @returns {Promise<boolean>} - true si l'utilisateur a suffisamment de fonds
+     */
+    static async hasSufficientFunds(userId, amount) {
+        const wallet = await this.getOrCreateWallet(userId);
+        return wallet.balance >= amount;
+    }
+
+    /**
+     * Traiter un pari entre deux joueurs
+     * @param {string} gameId - ID de la partie
+     * @param {string} player1Id - ID du joueur 1
+     * @param {string} player2Id - ID du joueur 2
+     * @param {number} betAmount - Montant du pari
+     * @param {string} gameType - Type de jeu
+     * @returns {Promise<Object>} - Résultat de l'opération
+     */
+    static async processBet(gameId, player1Id, player2Id, betAmount, gameType) {
+        // Vérifier que les deux joueurs ont suffisamment de fonds
+        const player1HasFunds = await this.hasSufficientFunds(player1Id, betAmount);
+        const player2HasFunds = await this.hasSufficientFunds(player2Id, betAmount);
+        
+        if (!player1HasFunds || !player2HasFunds) {
+            throw new APIError('Un ou plusieurs joueurs n\'ont pas suffisamment de fonds', status.BAD_REQUEST);
+        }
+        
+        // Retirer les fonds des deux joueurs
+        await this.removeFunds(
+            player1Id, 
+            betAmount, 
+            `Mise pour une partie de ${gameType}`, 
+            gameId,
+            'bet'
+        );
+        
+        await this.removeFunds(
+            player2Id, 
+            betAmount, 
+            `Mise pour une partie de ${gameType}`, 
+            gameId,
+            'bet'
+        );
+        
+        return {
+            success: true,
+            totalPot: betAmount * 2
+        };
+    }
+
+    /**
+     * Attribuer les gains au vainqueur
+     * @param {string} gameId - ID de la partie
+     * @param {string} winnerId - ID du joueur gagnant
+     * @param {number} amount - Montant à attribuer
+     * @param {string} gameType - Type de jeu
+     * @returns {Promise<Wallet>} - Portefeuille mis à jour du vainqueur
+     */
+    static async awardWinner(gameId, winnerId, amount, gameType) {
+        return await this.addFunds(
+            winnerId,
+            amount,
+            `Gains d'une partie de ${gameType}`,
+            gameId,
+            'win'
+        );
+    }
+
+    /**
+     * Rembourser les joueurs en cas de match nul
+     * @param {string} gameId - ID de la partie
+     * @param {string} player1Id - ID du joueur 1
+     * @param {string} player2Id - ID du joueur 2
+     * @param {number} betAmount - Montant du pari
+     * @param {string} gameType - Type de jeu
+     * @returns {Promise<Object>} - Résultat de l'opération
+     */
+    static async refundDraw(gameId, player1Id, player2Id, betAmount, gameType) {
+        await this.addFunds(
+            player1Id,
+            betAmount,
+            `Remboursement pour match nul (${gameType})`,
+            gameId,
+            'win'
+        );
+        
+        await this.addFunds(
+            player2Id,
+            betAmount,
+            `Remboursement pour match nul (${gameType})`,
+            gameId,
+            'win'
+        );
+        
+        return {
+            success: true,
+            message: 'Les deux joueurs ont été remboursés'
+        };
+    }
+
+    /**
+     * Obtenir l'historique des transactions d'un utilisateur
+     * @param {string} userId - ID de l'utilisateur
+     * @param {Object} options - Options de pagination
+     * @returns {Promise<Array>} - Liste des transactions
+     */
+    static async getTransactionHistory(userId, options = {}) {
+        const wallet = await this.getOrCreateWallet(userId);
+        
+        // Trier par date décroissante (plus récent en premier)
+        let transactions = wallet.transactions.sort((a, b) => b.createdAt - a.createdAt);
+        
+        // Pagination simple
+        const page = options.page || 1;
+        const limit = options.limit || 10;
+        const startIndex = (page - 1) * limit;
+        const endIndex = page * limit;
+        
+        transactions = transactions.slice(startIndex, endIndex);
+        
+        return {
+            transactions,
+            total: wallet.transactions.length,
+            page,
+            limit
+        };
+    }
+}
+
+walletSchema.loadClass(WalletClass);
+
+const Wallet = mongoose.model('wallets', walletSchema);
+
+export default Wallet;
+</file>
+
+<file path="backend/src/routes/v1/walletRoute.js">
+import { Router } from 'express';
+import catchAsync from '~/utils/catchAsync';
+import validate from '~/middlewares/validate';
+import authenticate from '~/middlewares/authenticate';
+import walletValidation from '~/validations/walletValidation';
+import walletController from '~/controllers/walletController';
+
+const router = Router();
+
+// Routes pour l'utilisateur connecté
+router.get('/me', authenticate(), catchAsync(walletController.getMyWallet));
+router.get('/transactions', authenticate(), validate(walletValidation.getMyTransactions), catchAsync(walletController.getMyTransactions));
+router.post('/bonus/daily', authenticate(), catchAsync(walletController.collectDailyBonus));
+
+// Routes liées aux paris
+router.post('/bet/check', authenticate(), validate(walletValidation.canPlaceBet), catchAsync(walletController.canPlaceBet));
+router.post('/bet/place', authenticate(), validate(walletValidation.placeBet), catchAsync(walletController.placeBet));
+router.post('/winnings/claim', authenticate(), validate(walletValidation.claimWinnings), catchAsync(walletController.claimWinnings));
+
+// Routes admin pour la gestion des fonds (nécessitent des permissions spéciales)
+router.post('/admin/add', authenticate('wallet:add'), validate(walletValidation.addFunds), catchAsync(walletController.addFunds));
+router.post('/admin/remove', authenticate('wallet:remove'), validate(walletValidation.removeFunds), catchAsync(walletController.removeFunds));
+
+export default router;
+</file>
+
+<file path="backend/src/socket/games/index.js">
+import logger from '../../config/logger';
+import { setupTicTacToe } from './ticTacToe';
+
+/**
+ * Configuration du namespace des jeux
+ * @param {SocketIO.Namespace} gamesNamespace - Namespace Socket.io des jeux
+ */
+const setupGamesNamespace = (gamesNamespace) => {
+  gamesNamespace.on('connection', (socket) => {
+    const user = socket.user;
+    logger.info(`User connected to games namespace: ${user.userName} (${user.id}) - Socket ID: ${socket.id}`);
+
+    // Configuration des gestionnaires d'événements spécifiques aux jeux
+    setupTicTacToe(socket, gamesNamespace);
+
+    // Écouter les erreurs dans la socket
+    socket.on('error', (error) => {
+      logger.error(`Socket error in games namespace for user ${user.userName} (${user.id}):`, error);
+    });
+
+    // Gérer la déconnexion
+    socket.on('disconnect', (reason) => {
+      logger.info(`User disconnected from games namespace: ${user.userName} (${user.id}) - Reason: ${reason}`);
+    });
+  });
+
+  // Écouter les erreurs dans le namespace
+  gamesNamespace.on('error', (error) => {
+    logger.error('Error in games namespace:', error);
+  });
+
+  logger.info('Games namespace initialized');
+};
+
+export {
+  setupGamesNamespace
+};
+</file>
+
+<file path="backend/src/socket/games/ticTacToe.js">
+import logger from '../../config/logger';
+
+// Structure pour suivre les parties de morpion en cours
+const ticTacToeGames = new Map();
+
+/**
+ * Utilitaire pour imprimer l'état actuel des parties
+ */
+const logGamesState = () => {
+  logger.info(`Current TicTacToe games: ${ticTacToeGames.size}`);
+  
+  if (ticTacToeGames.size === 0) {
+    logger.info('No active TicTacToe games');
+    return;
+  }
+  
+  for (const [gameId, game] of ticTacToeGames.entries()) {
+    logger.info(`Game ${gameId}: status=${game.status}, players=${game.players.length}`);
+  }
+};
+
+/**
+ * Nettoyage des parties inactives ou abandonnées
+ */
+const cleanupStaleGames = () => {
+  const threshold = Date.now() - (30 * 60 * 1000); // 30 minutes
+  let cleanedCount = 0;
+  
+  for (const [gameId, game] of ticTacToeGames.entries()) {
+    // Supprimer les parties en attente depuis plus de 30 minutes
+    if (game.created && game.created < threshold && game.status === 'waiting') {
+      ticTacToeGames.delete(gameId);
+      cleanedCount++;
+    }
+    
+    // Supprimer les parties terminées depuis plus de 10 minutes
+    if (game.status === 'finished' && game.finished && game.finished < (Date.now() - 10 * 60 * 1000)) {
+      ticTacToeGames.delete(gameId);
+      cleanedCount++;
+    }
+  }
+  
+  if (cleanedCount > 0) {
+    logger.info(`Cleaned up ${cleanedCount} stale TicTacToe games`);
+  }
+};
+
+// Exécuter un nettoyage périodique
+setInterval(cleanupStaleGames, 10 * 60 * 1000); // Toutes les 10 minutes
+
+/**
+ * Configuration des gestionnaires d'événements pour le jeu de morpion
+ * @param {SocketIO.Socket} socket - Socket de connexion
+ * @param {SocketIO.Namespace} gamesNamespace - Namespace des jeux
+ */
+const setupTicTacToe = (socket, gamesNamespace) => {
+  const user = socket.user;
+
+  // Rejoindre une salle d'attente pour le morpion
+  socket.on('joinTicTacToeLobby', () => {
+    try {
+      // Quitter les autres salles sauf celle de connexion
+      Array.from(socket.rooms)
+        .filter(room => room !== socket.id)
+        .forEach(room => {
+          logger.info(`User ${user.userName} leaving room ${room} to join lobby`);
+          socket.leave(room);
+        });
+  
+      // Rejoindre le lobby
+      socket.join('ticTacToeLobby');
+  
+      // Annoncer le nombre de joueurs dans le lobby
+      const lobbyUsers = Array.from(gamesNamespace.adapter.rooms.get('ticTacToeLobby') || []);
+      logger.info(`Lobby users count: ${lobbyUsers.length}`);
+  
+      gamesNamespace.to('ticTacToeLobby').emit('lobbyUpdate', {
+        players: lobbyUsers.length
+      });
+      
+      // Envoyer la liste des parties en attente au joueur qui vient de rejoindre
+      const availableGames = [];
+      for (const [gameId, game] of ticTacToeGames.entries()) {
+        if (game.status === 'waiting') {
+          availableGames.push({
+            gameId,
+            creator: game.creatorName
+          });
+        }
+      }
+      
+      logger.info(`Sending ${availableGames.length} available games to ${user.userName}`);
+      
+      // Envoyer uniquement au joueur qui rejoint
+      socket.emit('availableGames', { games: availableGames });
+      
+      logger.info(`User ${user.userName} joined TicTacToe lobby`);
+    } catch (error) {
+      logger.error(`Error in joinTicTacToeLobby for user ${user.userName}:`, error);
+      socket.emit('gameError', { message: 'Failed to join lobby' });
+    }
+  });
+  
+  // Créer une nouvelle partie de morpion
+  socket.on('createTicTacToeGame', async () => {
+    try {
+      // Générer un ID unique pour la partie
+      const timestamp = Date.now();
+      const gameId = `ttt-${timestamp}-${user.id}`;
+      
+      logger.info(`User ${user.userName} attempting to create a new TicTacToe game: ${gameId}`);
+      
+      // Vérifier si le joueur n'a pas déjà une partie en attente
+      for (const [existingId, game] of ticTacToeGames.entries()) {
+        if (game.status === 'waiting' && game.creator === user.id) {
+          logger.warn(`User ${user.userName} already has a waiting game: ${existingId}`);
+          return socket.emit('gameError', { message: 'You already have a game waiting for players' });
+        }
+      }
+      
+      // Quitter les autres salles (dont le lobby) sauf celle de connexion
+      Array.from(socket.rooms)
+        .filter(room => room !== socket.id)
+        .forEach(room => {
+          logger.info(`User ${user.userName} leaving room ${room} to create game ${gameId}`);
+          socket.leave(room);
+        });
+      
+      // Créer une nouvelle partie
+      ticTacToeGames.set(gameId, {
+        id: gameId,
+        creator: user.id,
+        creatorName: user.userName,
+        board: Array(9).fill(null),
+        currentTurn: user.id,
+        players: [
+          {
+            id: user.id,
+            name: user.userName,
+            symbol: 'X'
+          }
+        ],
+        status: 'waiting', // waiting, playing, finished
+        created: timestamp
+      });
+      
+      // Rejoindre la salle de jeu
+      socket.join(gameId);
+      logger.info(`User ${user.userName} has joined room ${gameId}`);
+      
+      // Informer le créateur
+      socket.emit('gameCreated', {
+        gameId,
+        game: ticTacToeGames.get(gameId)
+      });
+      
+      // Vérifier que le socket est bien dans la salle du lobby avant d'annoncer
+      if (gamesNamespace.adapter.rooms.get('ticTacToeLobby')?.size > 0) {
+        // Annoncer la nouvelle partie dans le lobby
+        gamesNamespace.to('ticTacToeLobby').emit('newGameAvailable', {
+          gameId,
+          creator: user.userName
+        });
+      }
+      
+      logger.info(`User ${user.userName} created TicTacToe game: ${gameId}`);
+      
+      // Planifier un nettoyage automatique des parties abandonnées
+      setTimeout(() => {
+        const game = ticTacToeGames.get(gameId);
+        if (game && game.status === 'waiting') {
+          ticTacToeGames.delete(gameId);
+          logger.info(`Automatically removed stale game: ${gameId}`);
+          gamesNamespace.to('ticTacToeLobby').emit('gameRemoved', { gameId });
+        }
+      }, 30 * 60 * 1000); // 30 minutes
+    } catch (error) {
+      logger.error(`Error creating game for user ${user.userName}:`, error);
+      socket.emit('gameError', { message: 'An error occurred while creating the game' });
+    }
+  });
+  
+  // Rejoindre une partie existante
+  socket.on('joinTicTacToeGame', async (data) => {
+    try {
+      if (!data || !data.gameId) {
+        logger.error(`Invalid join game request from ${user.userName}: Missing gameId`);
+        return socket.emit('gameError', { message: 'Game ID is required' });
+      }
+
+      const gameId = data.gameId.toString().trim();
+      
+      logger.info(`User ${user.userName} attempting to join game with ID: ${gameId}`);
+      logger.info(`Available games: ${Array.from(ticTacToeGames.keys()).join(', ')}`);
+      
+      const game = ticTacToeGames.get(gameId);
+      
+      if (!game) {
+        logger.error(`Game not found for ID: ${gameId}`);
+        return socket.emit('gameError', { message: 'Game not found' });
+      }
+      
+      if (game.status !== 'waiting') {
+        logger.error(`Game ${gameId} already started or finished, status: ${game.status}`);
+        return socket.emit('gameError', { message: 'Game already started or finished' });
+      }
+      
+      if (game.players.length >= 2) {
+        logger.error(`Game ${gameId} is full`);
+        return socket.emit('gameError', { message: 'Game is full' });
+      }
+
+      // Vérifier si le joueur est déjà dans la partie
+      if (game.players.some(p => p.id === user.id)) {
+        logger.error(`User ${user.userName} is already in game ${gameId}`);
+        return socket.emit('gameError', { message: 'You are already in this game' });
+      }
+      
+      // Quitter les autres salles (dont le lobby) sauf celle de connexion
+      Array.from(socket.rooms)
+        .filter(room => room !== socket.id)
+        .forEach(room => {
+          logger.info(`User ${user.userName} leaving room ${room} to join game ${gameId}`);
+          socket.leave(room);
+        });
+      
+      // Ajouter le joueur à la partie
+      game.players.push({
+        id: user.id,
+        name: user.userName,
+        symbol: 'O'
+      });
+      
+      // Mettre à jour le statut de la partie
+      game.status = 'playing';
+      
+      // Rejoindre la salle de jeu
+      socket.join(gameId);
+      logger.info(`User ${user.userName} has joined room ${gameId}`);
+      
+      // Informer tous les joueurs que la partie commence
+      gamesNamespace.to(gameId).emit('gameStarted', { game });
+      
+      // Retirer la partie de la liste des parties disponibles
+      gamesNamespace.to('ticTacToeLobby').emit('gameRemoved', { gameId });
+      
+      logger.info(`User ${user.userName} joined TicTacToe game: ${gameId}`);
+    } catch (error) {
+      logger.error(`Error joining game for user ${user.userName}:`, error);
+      socket.emit('gameError', { message: 'An error occurred while joining the game' });
+    }
+  });
+  
+  // Gérer un coup joué
+  socket.on('playTicTacToeMove', async (data) => {
+    try {
+      if (!data || typeof data !== 'object') {
+        logger.error(`Invalid move data from user ${user.userName}: data is not an object`);
+        return socket.emit('gameError', { message: 'Invalid move data' });
+      }
+      
+      const { gameId, position } = data;
+      
+      if (!gameId) {
+        logger.error(`Move attempt without gameId from user ${user.userName}`);
+        return socket.emit('gameError', { message: 'Game ID is required' });
+      }
+      
+      if (position === undefined || position === null) {
+        logger.error(`Move attempt without position from user ${user.userName} in game ${gameId}`);
+        return socket.emit('gameError', { message: 'Position is required' });
+      }
+
+      logger.info(`User ${user.userName} attempting to play move at position ${position} in game: ${gameId}`);
+      
+      const game = ticTacToeGames.get(gameId);
+      
+      if (!game) {
+        logger.error(`Game not found for move: ${gameId}`);
+        return socket.emit('gameError', { message: 'Game not found' });
+      }
+      
+      if (game.status !== 'playing') {
+        logger.error(`Game ${gameId} not in playing state, current status: ${game.status}`);
+        return socket.emit('gameError', { message: 'Game not in playing state' });
+      }
+      
+      if (game.currentTurn !== user.id) {
+        logger.error(`Not ${user.userName}'s turn in game ${gameId}. Current turn: ${game.currentTurn}`);
+        return socket.emit('gameError', { message: 'Not your turn' });
+      }
+      
+      if (position < 0 || position > 8 || game.board[position] !== null) {
+        logger.error(`Invalid move at position ${position} in game ${gameId}`);
+        return socket.emit('gameError', { message: 'Invalid move' });
+      }
+      
+      // Vérifier que le joueur est bien dans la partie
+      const playerInfo = game.players.find(p => p.id === user.id);
+      if (!playerInfo) {
+        logger.error(`User ${user.userName} is not a player in game ${gameId}`);
+        return socket.emit('gameError', { message: 'You are not a player in this game' });
+      }
+      
+      // Identifier le symbole du joueur
+      const playerSymbol = playerInfo.symbol;
+      
+      // Mettre à jour le plateau
+      game.board[position] = playerSymbol;
+      
+      // Vérifier si la partie est gagnée
+      const winPatterns = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8], // Lignes
+        [0, 3, 6], [1, 4, 7], [2, 5, 8], // Colonnes
+        [0, 4, 8], [2, 4, 6]             // Diagonales
+      ];
+      
+      let isWin = false;
+      for (const pattern of winPatterns) {
+        const [a, b, c] = pattern;
+        if (game.board[a] && game.board[a] === game.board[b] && game.board[a] === game.board[c]) {
+          isWin = true;
+          break;
+        }
+      }
+      
+      // Vérifier si match nul (plateau plein)
+      const isDraw = !game.board.includes(null) && !isWin;
+      
+      // Mettre à jour le statut de la partie
+      if (isWin) {
+        game.status = 'finished';
+        game.winner = user.id;
+        game.finished = Date.now();
+        gamesNamespace.to(gameId).emit('gameWon', { 
+          game,
+          winner: user.userName,
+          winnerSymbol: playerSymbol
+        });
+        logger.info(`User ${user.userName} won TicTacToe game: ${gameId}`);
+      } else if (isDraw) {
+        game.status = 'finished';
+        game.finished = Date.now();
+        gamesNamespace.to(gameId).emit('gameDraw', { game });
+        logger.info(`TicTacToe game ended in draw: ${gameId}`);
+      } else {
+        // Changer le tour
+        const opponent = game.players.find(p => p.id !== user.id);
+        if (!opponent) {
+          logger.error(`No opponent found in game ${gameId}`);
+          return socket.emit('gameError', { message: 'Game error: No opponent found' });
+        }
+        
+        game.currentTurn = opponent.id;
+        
+        // Informer de la mise à jour du plateau
+        gamesNamespace.to(gameId).emit('boardUpdated', { 
+          game,
+          lastMove: {
+            position,
+            symbol: playerSymbol,
+            player: user.userName
+          }
+        });
+        logger.info(`User ${user.userName} played move at position ${position} in game: ${gameId}`);
+      }
+    } catch (error) {
+      logger.error(`Error processing move for user ${user.userName}:`, error);
+      socket.emit('gameError', { message: 'An error occurred while processing your move' });
+    }
+  });
+  
+  // Quitter une partie
+  socket.on('leaveTicTacToeGame', async ({ gameId }) => {
+    try {
+      if (!gameId) {
+        logger.error(`Leave game request without gameId from user ${user.userName}`);
+        return socket.emit('gameError', { message: 'Game ID is required' });
+      }
+
+      logger.info(`User ${user.userName} attempting to leave game with ID: ${gameId}`);
+      
+      const game = ticTacToeGames.get(gameId);
+      
+      if (!game) {
+        logger.error(`Game not found when leaving: ${gameId}`);
+        return socket.emit('gameError', { message: 'Game not found' });
+      }
+      
+      // Vérifier que le joueur est bien dans la partie
+      const playerIndex = game.players.findIndex(p => p.id === user.id);
+      if (playerIndex === -1) {
+        logger.error(`User ${user.userName} tried to leave game ${gameId} but is not a player`);
+        return socket.emit('gameError', { message: 'You are not a player in this game' });
+      }
+
+      // Quitter la salle socket
+      socket.leave(gameId);
+      logger.info(`User ${user.userName} left socket room for game ${gameId}`);
+      
+      // Informer l'autre joueur
+      socket.to(gameId).emit('playerLeft', { 
+        player: user.userName,
+        game 
+      });
+      
+      // Si la partie était en cours, déclarer l'autre joueur gagnant
+      if (game.status === 'playing') {
+        game.status = 'finished';
+        game.finished = Date.now();
+        const opponent = game.players.find(p => p.id !== user.id);
+        
+        if (opponent) {
+          game.winner = opponent.id;
+          gamesNamespace.to(gameId).emit('gameWon', { 
+            game,
+            winner: opponent.name,
+            winnerSymbol: opponent.symbol,
+            byForfeit: true
+          });
+          logger.info(`User ${opponent.name} won TicTacToe game by forfeit: ${gameId}`);
+        }
+      }
+      
+      // Vérifier si la salle est vide - utiliser adapter.rooms pour vérifier correctement
+      const room = gamesNamespace.adapter.rooms.get(gameId);
+      if (!room || room.size === 0) {
+        // Tous les joueurs ont quitté, supprimer la partie
+        ticTacToeGames.delete(gameId);
+        logger.info(`TicTacToe game removed: ${gameId}`);
+        
+        // Annoncer la suppression au lobby
+        gamesNamespace.to('ticTacToeLobby').emit('gameRemoved', { gameId });
+      }
+      
+      logger.info(`User ${user.userName} left TicTacToe game: ${gameId}`);
+
+      // Redonner une confirmation au joueur
+      socket.emit('leaveGameSuccess', { gameId });
+    } catch (error) {
+      logger.error(`Error leaving game for user ${user.userName}:`, error);
+      socket.emit('gameError', { message: 'An error occurred while leaving the game' });
+    }
+  });
+  
+  // Gérer la déconnexion par rapport aux parties de morpion
+  socket.on('disconnect', (reason) => {
+    try {
+      logger.info(`User ${user.userName} disconnected from games namespace. Reason: ${reason}`);
+      
+      // Quitter le lobby s'il y était
+      socket.leave('ticTacToeLobby');
+      
+      // Log de débogage pour voir les jeux actifs
+      logGamesState();
+      
+      // Trouver toutes les parties où le joueur était présent
+      for (const [gameId, game] of ticTacToeGames.entries()) {
+        if (game.players.some(p => p.id === user.id)) {
+          logger.info(`Found disconnected user ${user.userName} in game ${gameId}, status: ${game.status}`);
+          
+          // Informer l'autre joueur
+          socket.to(gameId).emit('playerLeft', { 
+            player: user.userName,
+            game,
+            reason: 'disconnected'
+          });
+          
+          // Si la partie était en cours, déclarer l'autre joueur gagnant
+          if (game.status === 'playing') {
+            game.status = 'finished';
+            game.finished = Date.now();
+            const opponent = game.players.find(p => p.id !== user.id);
+            
+            if (opponent) {
+              game.winner = opponent.id;
+              logger.info(`Setting winner to ${opponent.name} (${opponent.id}) in game ${gameId}`);
+              
+              try {
+                gamesNamespace.to(gameId).emit('gameWon', { 
+                  game,
+                  winner: opponent.name,
+                  winnerSymbol: opponent.symbol,
+                  byForfeit: true,
+                  reason: 'opponent_disconnected'
+                });
+                logger.info(`User ${opponent.name} won TicTacToe game by forfeit (disconnect): ${gameId}`);
+              } catch (emitError) {
+                logger.error(`Error emitting gameWon event: ${emitError.message}`);
+              }
+            }
+          }
+          
+          // Vérifier si la salle est vide
+          const room = gamesNamespace.adapter.rooms.get(gameId);
+          if (!room || room.size === 0) {
+            // Supprimer la partie si tous les joueurs sont déconnectés
+            ticTacToeGames.delete(gameId);
+            logger.info(`TicTacToe game removed after disconnect: ${gameId}`);
+            
+            // Annoncer la suppression au lobby
+            try {
+              gamesNamespace.to('ticTacToeLobby').emit('gameRemoved', { gameId });
+            } catch (emitError) {
+              logger.error(`Error emitting gameRemoved event: ${emitError.message}`);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      logger.error(`Error handling disconnect for user ${user?.userName || 'unknown'}:`, error);
+    }
+  });
+};
+
+export {
+  setupTicTacToe,
+  ticTacToeGames
+};
+</file>
+
+<file path="backend/src/socket/index.js">
+import { Server } from 'socket.io';
+import logger from '~/config/logger';
+import config from '~/config/config';
+import { setupAuthMiddleware } from './middleware/auth';
+import { setupGamesNamespace } from './games';
+
+// Instances des serveurs socket
+let io;
+let gamesNamespace;
+
+/**
+ * Initialiser le serveur Socket.io
+ * @param {http.Server} httpServer - Serveur HTTP Express
+ */
+const initializeSocketServer = (httpServer) => {
+  // Création de l'instance Socket.io
+  io = new Server(httpServer, {
+    cors: {
+      origin: config.FRONTEND_URL,
+      methods: ["GET", "POST"],
+      credentials: true
+    },
+    // Options pour améliorer la fiabilité de la connexion
+    pingTimeout: 30000, // 30 secondes sans réponse avant déconnexion
+    pingInterval: 5000, // Envoyer un ping toutes les 5 secondes
+    connectTimeout: 10000, // 10 secondes pour établir la connexion
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000
+  });
+
+  // Configuration du middleware d'authentification globale
+  setupAuthMiddleware(io);
+
+  // Création et configuration du namespace des jeux
+  gamesNamespace = io.of('/games');
+  setupGamesNamespace(gamesNamespace);
+
+  // Écouteurs d'événements pour tracer les connexions/déconnexions
+  io.on('connection', (socket) => {
+    logger.info(`New socket connection: ${socket.id}`);
+    
+    socket.on('disconnect', (reason) => {
+      logger.info(`Socket disconnected: ${socket.id}, reason: ${reason}`);
+    });
+    
+    socket.on('error', (error) => {
+      logger.error(`Socket error for ${socket.id}:`, error);
+    });
+  });
+
+  logger.info('🎮 Socket.io server initialized');
+
+  return { io, gamesNamespace };
+};
+
+/**
+ * Obtenir l'instance Socket.io
+ * @returns {SocketIO.Server} - Instance Socket.io
+ */
+const getIo = () => {
+  if (!io) {
+    throw new Error('Socket.io not initialized');
+  }
+  return io;
+};
+
+/**
+ * Obtenir le namespace des jeux
+ * @returns {SocketIO.Namespace} - Namespace des jeux
+ */
+const getGamesNamespace = () => {
+  if (!gamesNamespace) {
+    throw new Error('Games namespace not initialized');
+  }
+  return gamesNamespace;
+};
+
+export {
+  initializeSocketServer,
+  getIo,
+  getGamesNamespace
+};
+</file>
+
+<file path="backend/src/socket/middleware/auth.js">
+import jwt from 'jsonwebtoken';
+import logger from '~/config/logger';
+import config from '~/config/config';
+import User from '~/models/userModel';
+
+/**
+ * Middleware d'authentification pour Socket.io
+ * @param {SocketIO.Socket} socket - Socket de connexion
+ * @param {Function} next - Fonction next
+ */
+const authMiddleware = async (socket, next) => {
+  try {
+    const token = socket.handshake.auth.token;
+    
+    logger.info(`Socket authentication attempt with token: ${token ? 'Token provided' : 'No token'}`);
+    
+    if (!token) {
+      logger.error('Socket authentication failed: No token provided');
+      return next(new Error('Authentication error: Token required'));
+    }
+    
+    // Vérifier le token JWT
+    const decoded = jwt.verify(token, config.JWT_ACCESS_TOKEN_SECRET_PUBLIC, { algorithms: ['RS256'] });
+    logger.info(`Token verified for user ID: ${decoded.sub}`);
+    
+    // Récupérer l'utilisateur associé
+    const user = await User.getUser(decoded.sub);
+    
+    if (!user) {
+      logger.error(`Socket authentication failed: User not found with ID ${decoded.sub}`);
+      return next(new Error('Authentication error: User not found'));
+    }
+    
+    // Stocker l'utilisateur dans l'objet socket pour un accès ultérieur
+    socket.user = user;
+    logger.info(`Socket authenticated for user: ${user.userName} (${user.id})`);
+    next();
+  } catch (error) {
+    logger.error('Socket authentication error:', error);
+    next(new Error('Authentication error: Invalid token'));
+  }
+};
+
+/**
+ * Configuration du middleware d'authentification pour Socket.io
+ * @param {SocketIO.Server} io - Serveur Socket.io
+ */
+const setupAuthMiddleware = (io) => {
+  // Middleware d'authentification pour toutes les connexions
+  io.use(authMiddleware);
+  
+  // Middleware d'authentification pour le namespace des jeux
+  io.of('/games').use(authMiddleware);
+};
+
+export {
+  authMiddleware,
+  setupAuthMiddleware
+};
+</file>
+
+<file path="backend/src/validations/walletValidation.js">
+import Joi from 'joi';
+import { mongoId } from './customValidation';
+
+export const getMyTransactions = {
+    query: Joi.object().keys({
+        page: Joi.number().integer().min(1),
+        limit: Joi.number().integer().min(1).max(100)
+    })
+};
+
+export const addFunds = {
+    body: Joi.object().keys({
+        userId: Joi.string().custom(mongoId).required(),
+        amount: Joi.number().positive().required(),
+        description: Joi.string().min(3).max(100).required()
+    })
+};
+
+export const removeFunds = {
+    body: Joi.object().keys({
+        userId: Joi.string().custom(mongoId).required(),
+        amount: Joi.number().positive().required(),
+        description: Joi.string().min(3).max(100).required()
+    })
+};
+
+export const canPlaceBet = {
+    body: Joi.object().keys({
+        amount: Joi.number().positive().required()
+    })
+};
+
+export const placeBet = {
+    body: Joi.object().keys({
+        gameId: Joi.string().required(),
+        amount: Joi.number().positive().required(),
+        gameType: Joi.string().required()
+    })
+};
+
+export const claimWinnings = {
+    body: Joi.object().keys({
+        gameId: Joi.string().required(),
+        amount: Joi.number().positive().required(),
+        gameType: Joi.string().required()
+    })
+};
+
+export default {
+    getMyTransactions,
+    addFunds,
+    removeFunds,
+    canPlaceBet,
+    placeBet,
+    claimWinnings
+};
+</file>
+
+<file path="frontend/src/pages/HomePage.js">
+import authService from '../services/authService.js';
+import walletService from '../services/walletService.js';
+
+/**
+ * Composant pour la page d'accueil
+ */
+class HomePage {
+  constructor() {
+    this.container = document.createElement('div');
+    this.container.className = 'home-container';
+    this.user = null;
+    this.wallet = null;
+    
+    // Lier les méthodes
+    this.handleLogout = this.handleLogout.bind(this);
+    this.handleCollectBonus = this.handleCollectBonus.bind(this);
+    this.loadGameCenter = this.loadGameCenter.bind(this);
+  }
+
+  /**
+   * Gérer la déconnexion
+   */
+  async handleLogout() {
+    try {
+      await authService.logout();
+      window.location.hash = '/login';
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion:', error);
+      this.showNotification('Erreur lors de la déconnexion.', 'error');
+    }
+  }
+
+  /**
+   * Gérer la collecte du bonus quotidien
+   */
+  async handleCollectBonus() {
+    const bonusButton = document.getElementById('collect-bonus-btn');
+    
+    if (bonusButton) {
+      bonusButton.disabled = true;
+      bonusButton.innerHTML = 'Collecte en cours... <div class="spinner"></div>';
+    }
+    
+    try {
+      const response = await walletService.collectDailyBonus();
+      
+      if (response.success) {
+        this.wallet.balance = response.data.newBalance;
+        this.updateWalletInfo();
+        this.showNotification(`${response.data.message}`, 'success');
+        
+        // Désactiver le bouton après la collecte
+        if (bonusButton) {
+          bonusButton.innerHTML = 'Bonus collecté aujourd\'hui';
+          bonusButton.classList.add('disabled-btn');
+        }
+      }
+    } catch (error) {
+      console.error('Erreur lors de la collecte du bonus:', error);
+      this.showNotification(error.errors ? 
+        error.errors[0].message : 
+        'Erreur lors de la collecte du bonus.', 'error');
+      
+      // Réactiver le bouton en cas d'erreur
+      if (bonusButton) {
+        bonusButton.disabled = false;
+        bonusButton.innerHTML = 'Collecter le bonus quotidien';
+      }
+    }
+  }
+
+  /**
+   * Charger la section de jeu
+   * @param {string} gameType - Type de jeu
+   */
+  loadGameCenter(gameType) {
+    if (gameType === 'tic-tac-toe') {
+      window.location.hash = '/tic-tac-toe';
+    }
+  }
+
+  /**
+   * Afficher une notification
+   * @param {string} message - Message à afficher
+   * @param {string} type - Type de notification (info, success, error, warning)
+   */
+  showNotification(message, type = 'info') {
+    const notificationsContainer = document.getElementById('notifications');
+    if (!notificationsContainer) return;
+    
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    
+    notificationsContainer.appendChild(notification);
+    
+    // Supprimer la notification après 5 secondes
+    setTimeout(() => {
+      notification.classList.add('fade-out');
+      setTimeout(() => {
+        if (notification.parentNode === notificationsContainer) {
+          notificationsContainer.removeChild(notification);
+        }
+      }, 500);
+    }, 5000);
+  }
+
+  /**
+   * Charger les données utilisateur
+   */
+  async loadUserData() {
+    try {
+      const response = await authService.getCurrentUser();
+      if (response.success) {
+        this.user = response.data;
+        this.updateUserInfo();
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des données utilisateur:', error);
+      this.showNotification('Erreur lors du chargement des données utilisateur.', 'error');
+    }
+  }
+
+  /**
+   * Charger les données du portefeuille
+   */
+  async loadWalletData() {
+    try {
+      const response = await walletService.getMyWallet();
+      if (response.success) {
+        this.wallet = response.data;
+        this.updateWalletInfo();
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement du portefeuille:', error);
+      this.showNotification('Erreur lors du chargement des données du portefeuille.', 'error');
+    }
+  }
+
+  /**
+   * Mettre à jour les informations utilisateur dans le DOM
+   */
+  updateUserInfo() {
+    const userInfoElement = document.getElementById('user-info');
+    if (userInfoElement && this.user) {
+      userInfoElement.innerHTML = `
+        <p><strong>Nom d'utilisateur:</strong> ${this.user.userName}</p>
+        ${this.user.email ? `<p><strong>Email:</strong> ${this.user.email}</p>` : ''}
+        ${this.user.roles && this.user.roles.length ? 
+          `<p><strong>Rôles:</strong> ${this.user.roles.map(role => role.name).join(', ')}</p>` : ''}
+      `;
+    }
+  }
+
+  /**
+   * Mettre à jour les informations du portefeuille dans le DOM
+   */
+  updateWalletInfo() {
+    const walletInfoElement = document.getElementById('wallet-info');
+    if (walletInfoElement && this.wallet) {
+      walletInfoElement.innerHTML = `
+        <h3 class="wallet-title">Votre Portefeuille</h3>
+        <div class="wallet-balance">
+          <span class="balance-amount">${this.wallet.balance}</span>
+          <span class="balance-currency">GameCoins</span>
+        </div>
+      `;
+    }
+  }
+
+  /**
+   * Initialisation après le rendu
+   */
+  async afterRender() {
+    // Récupérer l'utilisateur stocké localement
+    this.user = authService.getStoredUser();
+    this.updateUserInfo();
+    
+    // Charger les données fraîches depuis le serveur
+    await Promise.all([
+      this.loadUserData(),
+      this.loadWalletData()
+    ]);
+    
+    // Ajouter les écouteurs d'événements
+    const logoutButton = document.getElementById('logout-btn');
+    if (logoutButton) {
+      logoutButton.addEventListener('click', this.handleLogout);
+    }
+    
+    // Ajouter un écouteur pour le bouton de bonus
+    const bonusButton = document.getElementById('collect-bonus-btn');
+    if (bonusButton) {
+      bonusButton.addEventListener('click', this.handleCollectBonus);
+    }
+    
+    // Ajouter un écouteur pour le bouton de jeu
+    const ticTacToeButton = document.getElementById('tic-tac-toe-btn');
+    if (ticTacToeButton) {
+      ticTacToeButton.addEventListener('click', () => this.loadGameCenter('tic-tac-toe'));
+    }
+  }
+
+  /**
+   * Rendu du composant
+   * @returns {HTMLElement} - Élément HTML du composant
+   */
+  render() {
+    this.container.innerHTML = `
+      <h1 class="home-title">GameCenter <span class="accent-text">JS</span></h1>
+      <p class="home-subtitle">Votre plateforme de jeux multijoueur avec paris virtuels</p>
+      
+      <div class="profile-section">
+        <div class="card user-card">
+          <h3 class="card-title">Profil</h3>
+          <div id="user-info" class="user-info">
+            <div class="spinner"></div>
+            <p>Chargement des informations utilisateur...</p>
+          </div>
+        </div>
+        
+        <div class="card wallet-card">
+          <div id="wallet-info" class="wallet-info">
+            <div class="spinner"></div>
+            <p>Chargement du portefeuille...</p>
+          </div>
+          <div class="wallet-actions">
+            <button id="collect-bonus-btn" class="bonus-btn">Collecter le bonus quotidien</button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="games-section">
+        <h2 class="section-title">Nos jeux</h2>
+        <div class="games-grid">
+          <div class="game-card">
+            <div class="game-icon">🎮</div>
+            <h3 class="game-title">Morpion</h3>
+            <p class="game-description">Affrontez d'autres joueurs dans ce classique du jeu à deux!</p>
+            <div class="game-details">
+              <span class="game-price">Mise: 50 - 200 GameCoins</span>
+              <span class="game-reward">Gain: Double ou rien</span>
+            </div>
+            <button id="tic-tac-toe-btn" class="primary-btn">Jouer maintenant</button>
+          </div>
+          
+          <div class="game-card coming-soon">
+            <div class="game-icon">🎲</div>
+            <h3 class="game-title">Dés</h3>
+            <p class="game-description">Tentez votre chance avec ce jeu de dés simple et addictif.</p>
+            <div class="game-details">
+              <span class="game-price">Mise: 10 - 100 GameCoins</span>
+              <span class="game-reward">Gains: jusqu'à x6</span>
+            </div>
+            <button disabled class="disabled-btn">Bientôt disponible</button>
+          </div>
+          
+          <div class="game-card coming-soon">
+            <div class="game-icon">🃏</div>
+            <h3 class="game-title">Blackjack</h3>
+            <p class="game-description">Le célèbre jeu de cartes où il faut s'approcher de 21 sans le dépasser.</p>
+            <div class="game-details">
+              <span class="game-price">Mise: 50 - 500 GameCoins</span>
+              <span class="game-reward">Gains: x1.5 à x2</span>
+            </div>
+            <button disabled class="disabled-btn">Bientôt disponible</button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="home-actions">
+        <button id="logout-btn" class="danger-btn">Se déconnecter</button>
+      </div>
+      
+      <div id="notifications" class="notifications-container"></div>
+    `;
+    
+    return this.container;
+  }
+}
+
+export default HomePage;
+</file>
+
+<file path="frontend/src/pages/TicTacToePage.js">
+import { TicTacToeService } from '../services/socket';
+import authService from '../services/authService.js';
+import walletService from '../services/walletService.js';
+
+/**
+ * Page du jeu de morpion (Tic Tac Toe)
+ */
+class TicTacToePage {
+  constructor() {
+    this.container = document.createElement('div');
+    this.container.className = 'game-container';
+    this.gameId = null;
+    this.gameState = null;
+    this.playerSymbol = null;
+    this.isMyTurn = false;
+    this.userId = authService.getStoredUser()?.id;
+    this.betAmount = 50; // Montant fixe pour une partie de morpion
+    this.hasBet = false; // Indique si le joueur a déjà misé
+    
+    // Lier les méthodes
+    this.setupEventListeners = this.setupEventListeners.bind(this);
+    this.handleCellClick = this.handleCellClick.bind(this);
+    this.handleCreateGame = this.handleCreateGame.bind(this);
+    this.handleJoinGame = this.handleJoinGame.bind(this);
+    this.handleLeaveGame = this.handleLeaveGame.bind(this);
+    this.handleBackToLobby = this.handleBackToLobby.bind(this);
+    this.handlePlaceBet = this.handlePlaceBet.bind(this);
+  }
+
+  /**
+   * Configuration des écouteurs d'événements socket.io
+   */
+  async setupEventListeners() {
+    // Se connecter au service de jeu
+    try {
+      await TicTacToeService.connect();
+      
+      // Écouteurs pour le lobby
+      TicTacToeService.onLobbyUpdate((data) => {
+        const lobbyPlayersElement = document.getElementById('lobby-players');
+        if (lobbyPlayersElement) {
+          lobbyPlayersElement.textContent = `Joueurs en attente: ${data.players}`;
+        }
+      });
+      
+      TicTacToeService.onNewGameAvailable((data) => {
+        this.addGameToList(data.gameId, data.creator);
+      });
+      
+      TicTacToeService.onGameRemoved((data) => {
+        const gameElement = document.getElementById(`game-${data.gameId}`);
+        if (gameElement) {
+          gameElement.remove();
+        }
+      });
+      
+      // Nouvelle fonction pour gérer la liste des parties disponibles
+      TicTacToeService.onAvailableGames((data) => {
+        const gamesList = document.getElementById('games-list');
+        if (!gamesList) return;
+        
+        // Nettoyer la liste existante et garder uniquement le message "Aucune partie disponible"
+        const noGamesMessage = gamesList.querySelector('.no-games');
+        gamesList.innerHTML = '';
+        
+        // Si aucune partie disponible, afficher le message
+        if (data.games.length === 0) {
+          gamesList.innerHTML = '<p class="no-games">Aucune partie disponible. Créez-en une!</p>';
+          return;
+        }
+        
+        // Ajouter chaque partie disponible à la liste
+        data.games.forEach(game => {
+          this.addGameToList(game.gameId, game.creator);
+        });
+      });
+      
+      // Écouteurs pour la partie
+      TicTacToeService.onGameCreated((data) => {
+        this.gameId = data.gameId;
+        this.gameState = data.game;
+        this.playerSymbol = 'X'; // Le créateur joue toujours avec X
+        this.renderGame();
+      });
+      
+      TicTacToeService.onGameStarted((data) => {
+        this.gameState = data.game;
+        this.gameId = data.game.id; // S'assurer que l'ID de jeu est correctement stocké
+        
+        this.playerSymbol = this.gameState.players.find(p => p.id === this.userId)?.symbol;
+        this.isMyTurn = this.gameState.currentTurn === this.userId;
+        this.renderGame();
+      });
+      
+      TicTacToeService.onBoardUpdated((data) => {
+        this.gameState = data.game;
+        
+        // S'assurer que l'ID du jeu est maintenu
+        if (data.game && data.game.id) {
+          if (this.gameId !== data.game.id) {
+            this.gameId = data.game.id;
+          }
+        }
+        
+        this.isMyTurn = this.gameState.currentTurn === this.userId;
+        this.renderGame();
+        
+        // Afficher une notification du dernier coup joué
+        this.showNotification(`${data.lastMove.player} a joué en position ${data.lastMove.position + 1}`);
+      });
+      
+      TicTacToeService.onGameWon((data) => {
+        this.gameState = data.game;
+        
+        // S'assurer que l'ID du jeu est maintenu
+        if (data.game && data.game.id && this.gameId !== data.game.id) {
+          this.gameId = data.game.id;
+        }
+        
+        this.renderGame();
+        
+        const message = data.byForfeit 
+          ? `${data.winner} a gagné par forfait!` 
+          : `${data.winner} a gagné avec les ${data.winnerSymbol}!`;
+        
+        this.showNotification(message, 'success');
+      });
+      
+      TicTacToeService.onGameDraw((data) => {
+        this.gameState = data.game;
+        
+        // S'assurer que l'ID du jeu est maintenu
+        if (data.game && data.game.id && this.gameId !== data.game.id) {
+          this.gameId = data.game.id;
+        }
+        
+        this.renderGame();
+        this.showNotification('Match nul!', 'warning');
+      });
+      
+      TicTacToeService.onPlayerLeft((data) => {
+        this.showNotification(`${data.player} a quitté la partie`, 'error');
+      });
+      
+      TicTacToeService.onGameError((data) => {
+        this.showNotification(data.message, 'error');
+      });
+      
+      // Rejoindre le lobby au démarrage
+      TicTacToeService.joinLobby();
+      
+    } catch (error) {
+      console.error('Failed to setup socket connections:', error);
+      this.showNotification('Impossible de se connecter au serveur de jeu', 'error');
+    }
+  }
+
+  /**
+   * Gérer un clic sur une cellule du plateau
+   * @param {Event} e - Événement de clic
+   */
+  async handleCellClick(e) {
+    // Vérifier d'abord si l'ID de jeu est défini
+    if (!this.gameId) {
+      console.error('Cannot play move: gameId is not defined');
+      this.showNotification('Erreur: Impossible de jouer. ID de jeu manquant.', 'error');
+      return;
+    }
+
+    if (!this.gameState || this.gameState.status !== 'playing' || !this.isMyTurn) {
+      console.warn('Cannot play: game not in correct state', {
+        gameId: this.gameId,
+        gameState: this.gameState ? this.gameState.status : 'null',
+        isMyTurn: this.isMyTurn
+      });
+      return;
+    }
+    
+    const cell = e.target;
+    const position = parseInt(cell.dataset.index, 10);
+    
+    if (isNaN(position) || this.gameState.board[position] !== null) {
+      console.warn(`Invalid position ${position} in game ${this.gameId}`);
+      return;
+    }
+    
+    try {
+      await TicTacToeService.playMove(this.gameId, position);
+    } catch (error) {
+      console.error(`Error playing move at position ${position}:`, error);
+      this.showNotification(`Erreur lors de la tentative de jouer: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Gérer la création d'une nouvelle partie
+   */
+  async handleCreateGame() {
+    try {
+      await TicTacToeService.createGame();
+    } catch (error) {
+      console.error('Error creating game:', error);
+      this.showNotification(`Erreur lors de la création de la partie: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Gérer la participation à une partie existante
+   * @param {string} gameId - ID de la partie à rejoindre
+   */
+  async handleJoinGame(gameId) {
+    try {
+      await TicTacToeService.joinGame(gameId);
+    } catch (error) {
+      console.error('Error joining game:', error);
+      this.showNotification(`Erreur lors de la tentative de rejoindre la partie: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Gérer le retour au lobby
+   */
+  async handleBackToLobby() {
+    // Nettoyer l'état de la partie
+    this.gameId = null;
+    this.gameState = null;
+    this.playerSymbol = null;
+    this.isMyTurn = false;
+    
+    try {
+      // Rejoindre à nouveau le lobby
+      await TicTacToeService.joinLobby();
+      
+      // Rendre le lobby
+      this.renderLobby();
+    } catch (error) {
+      console.error('Error returning to lobby:', error);
+      this.showNotification(`Erreur lors du retour au lobby: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Gérer le départ d'une partie
+   */
+  async handleLeaveGame() {
+    if (this.gameId) {
+      try {
+        await TicTacToeService.leaveGame(this.gameId);
+        await this.handleBackToLobby();
+      } catch (error) {
+        console.error(`Error leaving game ${this.gameId}:`, error);
+        this.showNotification(`Erreur lors de la tentative de quitter la partie: ${error.message}`, 'error');
+      }
+    }
+  }
+
+  /**
+   * Ajouter une partie à la liste des parties disponibles
+   * @param {string} gameId - ID de la partie
+   * @param {string} creator - Nom du créateur
+   */
+  addGameToList(gameId, creator) {
+    const gamesList = document.getElementById('games-list');
+    if (!gamesList) return;
+    
+    const gameItem = document.createElement('div');
+    gameItem.id = `game-${gameId}`;
+    gameItem.className = 'game-item';
+    gameItem.innerHTML = `
+      <span>Partie créée par ${creator}</span>
+      <button class="join-game-btn">Rejoindre</button>
+    `;
+    
+    gamesList.appendChild(gameItem);
+    
+    // Ajouter l'écouteur d'événement au bouton de participation
+    const joinButton = gameItem.querySelector('.join-game-btn');
+    joinButton.addEventListener('click', () => this.handleJoinGame(gameId));
+  }
+
+  /**
+   * Afficher une notification
+   * @param {string} message - Message à afficher
+   * @param {string} type - Type de notification (info, success, error, warning)
+   */
+  showNotification(message, type = 'info') {
+    const notificationsContainer = document.getElementById('notifications');
+    if (!notificationsContainer) return;
+    
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    
+    notificationsContainer.appendChild(notification);
+    
+    // Supprimer la notification après 5 secondes
+    setTimeout(() => {
+      notification.classList.add('fade-out');
+      setTimeout(() => {
+        if (notification.parentNode === notificationsContainer) {
+          notificationsContainer.removeChild(notification);
+        }
+      }, 500);
+    }, 5000);
+  }
+
+  /**
+   * Rendre le lobby du jeu
+   */
+  renderLobby() {
+    this.container.innerHTML = `
+      <div class="game-header">
+        <h1>Morpion - Lobby</h1>
+        <p id="lobby-players">Joueurs en attente: 0</p>
+      </div>
+      
+      <div class="game-actions">
+        <button id="create-game-btn" class="primary-btn">Créer une partie</button>
+      </div>
+      
+      <div class="available-games">
+        <h2>Parties disponibles</h2>
+        <div id="games-list" class="games-list">
+          <p class="no-games">Aucune partie disponible. Créez-en une!</p>
+        </div>
+      </div>
+      
+      <div id="notifications" class="notifications-container"></div>
+    `;
+    
+    // Ajouter les écouteurs d'événements
+    const createGameBtn = this.container.querySelector('#create-game-btn');
+    if (createGameBtn) {
+      createGameBtn.addEventListener('click', this.handleCreateGame);
+    }
+  }
+
+  /**
+   * Rendre le plateau de jeu
+   */
+  renderGame() {
+    if (!this.gameState) return;
+    
+    // Déterminer le statut de la partie et le message à afficher
+    let statusMessage = '';
+    let gameStatus = this.gameState.status;
+    
+    if (gameStatus === 'waiting') {
+      statusMessage = `En attente d'un autre joueur...`;
+    } else if (gameStatus === 'playing') {
+      const currentPlayer = this.gameState.players.find(p => p.id === this.gameState.currentTurn);
+      statusMessage = this.isMyTurn 
+        ? `C'est votre tour (${this.playerSymbol})` 
+        : `C'est le tour de ${currentPlayer?.name} (${currentPlayer?.symbol})`;
+    } else if (gameStatus === 'finished') {
+      if (this.gameState.winner) {
+        const winner = this.gameState.players.find(p => p.id === this.gameState.winner);
+        statusMessage = this.gameState.winner === this.userId 
+          ? 'Vous avez gagné!' 
+          : `${winner?.name} a gagné!`;
+      } else {
+        statusMessage = 'Match nul!';
+      }
+    }
+    
+    // Générer le HTML du plateau
+    const boardHTML = this.gameState.board.map((cell, index) => {
+      const cellValue = cell || '';
+      const cellClass = `ttt-cell ${cell ? `cell-${cell.toLowerCase()}` : ''} ${this.isMyTurn && !cell ? 'clickable' : ''}`;
+      
+      return `<div class="${cellClass}" data-index="${index}">${cellValue}</div>`;
+    }).join('');
+    
+    // Rendre le contenu
+    this.container.innerHTML = `
+      <div class="game-header">
+        <h1>Morpion</h1>
+        <p class="game-status">${statusMessage}</p>
+      </div>
+      
+      <div class="ttt-board">${boardHTML}</div>
+      
+      <div class="game-info">
+        ${this.gameState.players.map(player => `
+          <div class="player-info ${player.id === this.gameState.currentTurn ? 'current-player' : ''}">
+            <span class="player-name">${player.name}</span>
+            <span class="player-symbol">(${player.symbol})</span>
+            ${player.id === this.userId ? '<span class="you-tag">Vous</span>' : ''}
+          </div>
+        `).join('')}
+      </div>
+      
+      <div class="game-actions">
+        ${gameStatus === 'finished' 
+          ? '<button id="back-to-lobby-btn" class="secondary-btn">Retour au lobby</button>' 
+          : `
+            <button id="leave-game-btn" class="danger-btn">Quitter la partie</button>
+            ${!this.hasBet && gameStatus === 'playing' ? 
+              `<button id="place-bet-btn" class="primary-btn">Parier ${this.betAmount} GameCoins</button>` : 
+              ''
+            }
+          `
+        }
+      </div>
+      
+      <div id="notifications" class="notifications-container"></div>
+    `;
+    
+    // Ajouter les écouteurs d'événements
+    if (gameStatus === 'finished') {
+      const backToLobbyBtn = this.container.querySelector('#back-to-lobby-btn');
+      if (backToLobbyBtn) {
+        backToLobbyBtn.addEventListener('click', this.handleBackToLobby);
+      }
+    } else {
+      const leaveGameBtn = this.container.querySelector('#leave-game-btn');
+      if (leaveGameBtn) {
+        leaveGameBtn.addEventListener('click', this.handleLeaveGame);
+      }
+      
+      // Ajouter l'écouteur pour le bouton de pari s'il existe
+      const placeBetBtn = this.container.querySelector('#place-bet-btn');
+      if (placeBetBtn) {
+        placeBetBtn.addEventListener('click', this.handlePlaceBet);
+      }
+    }
+    
+    // Ajouter les écouteurs pour les cellules clickables
+    if (gameStatus === 'playing' && this.isMyTurn) {
+      const cells = this.container.querySelectorAll('.ttt-cell.clickable');
+      cells.forEach(cell => {
+        cell.addEventListener('click', this.handleCellClick);
+      });
+    }
+  }
+
+  /**
+   * Méthode appelée après le rendu initial
+   */
+  async afterRender() {
+    try {
+      await this.setupEventListeners();
+      
+      // Rendre le lobby initialement
+      this.renderLobby();
+    } catch (error) {
+      console.error('Error setting up TicTacToe page:', error);
+      this.showNotification('Erreur lors de l\'initialisation du jeu. Veuillez rafraîchir la page.', 'error');
+    }
+  }
+
+  /**
+   * Gérer le placement d'un pari pour une partie
+   */
+  async handlePlaceBet() {
+    try {
+      if (!this.gameId) {
+        this.showNotification('Impossible de placer un pari sans partie active', 'error');
+        return;
+      }
+      
+      if (this.hasBet) {
+        this.showNotification('Vous avez déjà placé un pari pour cette partie', 'warning');
+        return;
+      }
+      
+      // Vérifier d'abord si l'utilisateur peut placer le pari
+      const canBetResponse = await walletService.canPlaceBet(this.betAmount);
+      
+      if (!canBetResponse.success || !canBetResponse.data.canPlaceBet) {
+        this.showNotification('Fonds insuffisants pour placer ce pari', 'error');
+        return;
+      }
+      
+      // Placer le pari
+      const betResponse = await walletService.placeBet(this.gameId, this.betAmount, 'Morpion');
+      
+      if (betResponse.success) {
+        this.hasBet = true;
+        this.showNotification(`Pari de ${this.betAmount} GameCoins placé avec succès!`, 'success');
+      }
+    } catch (error) {
+      console.error('Error placing bet:', error);
+      this.showNotification(`Erreur lors du placement du pari: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Méthode appelée lors de la destruction du composant
+   */
+  async destroy() {
+    try {
+      // Nettoyer les écouteurs d'événements
+      TicTacToeService.clearListeners();
+      
+      // Si dans une partie, la quitter proprement
+      if (this.gameId) {
+        await TicTacToeService.leaveGame(this.gameId);
+      }
+    } catch (error) {
+      console.error('Error cleaning up TicTacToe component:', error);
+    }
+  }
+
+  /**
+   * Rendu du composant
+   * @returns {HTMLElement} - Élément HTML du composant
+   */
+  render() {
+    // Le contenu sera rempli par afterRender
+    this.container.innerHTML = `
+      <div class="game-loading">
+        <h1>Chargement du jeu...</h1>
+        <div class="spinner"></div>
+      </div>
+    `;
+    
+    return this.container;
+  }
+}
+
+export default TicTacToePage;
+</file>
+
+<file path="frontend/src/services/socket/BaseSocketService.js">
+import { io } from 'socket.io-client';
+
+/**
+ * Service de base pour les connexions socket
+ */
+class BaseSocketService {
+  constructor(namespace = '') {
+    this.socket = null;
+    this.namespace = namespace;
+    this.isConnected = false;
+    this.listeners = new Map();
+    this.serverUrl = 'http://localhost:3002'; // Devrait être en configuration
+  }
+
+  /**
+   * Connecter au serveur socket.io
+   * @returns {Promise} Résolution lorsque connecté
+   */
+  connect() {
+    return new Promise((resolve, reject) => {
+      if (this.isConnected && this.socket) {
+        return resolve(this.socket);
+      }
+
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        return reject(new Error('No authentication token available'));
+      }
+
+      const url = this.namespace ? `${this.serverUrl}/${this.namespace}` : this.serverUrl;
+      
+      this.socket = io(url, {
+        auth: { token },
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000
+      });
+
+      this.socket.on('connect', () => {
+        this.isConnected = true;
+        resolve(this.socket);
+      });
+
+      this.socket.on('connect_error', (error) => {
+        console.error(`Socket connection error to ${this.namespace || 'main'} namespace:`, error);
+        this.isConnected = false;
+        reject(error);
+      });
+
+      this.socket.on('disconnect', (reason) => {
+        this.isConnected = false;
+      });
+    });
+  }
+
+  /**
+   * Déconnecter du serveur socket.io
+   */
+  disconnect() {
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
+      this.isConnected = false;
+      this.listeners.clear();
+    }
+  }
+
+  /**
+   * Émettre un événement
+   * @param {string} eventName - Nom de l'événement
+   * @param {Object} data - Données à envoyer
+   * @returns {Promise} - Promise qui se résout quand l'événement est envoyé
+   */
+  emit(eventName, data = {}) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // S'assurer que le socket est connecté
+        if (!this.isConnected || !this.socket) {
+          console.warn(`Socket not connected for event '${eventName}'. Attempting to connect...`);
+          try {
+            await this.connect();
+          } catch (error) {
+            console.error(`Failed to connect for emitting event '${eventName}':`, error);
+            return reject(error);
+          }
+        }
+        
+        // Nettoyer et vérifier les données
+        const cleanData = {};
+        
+        if (data && typeof data === 'object') {
+          // Vérifier chaque propriété et ne garder que celles qui sont valides
+          Object.entries(data).forEach(([key, value]) => {
+            // Éviter les undefined et les valeurs vides là où c'est important
+            if (value !== undefined) {
+              if (typeof value === 'string') {
+                // Nettoyer les chaînes de caractères
+                cleanData[key] = value.trim();
+              } else {
+                cleanData[key] = value;
+              }
+            }
+          });
+        }
+        
+        // Émission de l'événement avec les données nettoyées
+        this.socket.emit(eventName, cleanData);
+        resolve();
+      } catch (error) {
+        console.error(`Error emitting event '${eventName}':`, error);
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Ajouter un écouteur d'événement avec gestion d'erreur
+   * @param {string} eventName - Nom de l'événement
+   * @param {Function} callback - Fonction de rappel
+   * @returns {Promise} - Promise qui se résout quand l'écouteur est ajouté
+   */
+  async on(eventName, callback) {
+    try {
+      // S'assurer que le socket est connecté
+      if (!this.isConnected || !this.socket) {
+        console.warn(`Socket not connected for adding listener '${eventName}'. Attempting to connect...`);
+        try {
+          await this.connect();
+        } catch (error) {
+          console.error(`Failed to connect for adding listener '${eventName}':`, error);
+          throw error;
+        }
+      }
+
+      // Créer un wrapper pour le callback qui gère les erreurs
+      const safeCallback = (...args) => {
+        try {
+          
+          // Exécuter le callback original avec ses arguments
+          callback(...args);
+        } catch (error) {
+          console.error(`Error in callback for event '${eventName}':`, error);
+        }
+      };
+
+      // Stocker la référence du callback pour pouvoir le supprimer plus tard
+      if (!this.listeners.has(eventName)) {
+        this.listeners.set(eventName, []);
+      }
+      // Stocker le callback original et son wrapper
+      this.listeners.get(eventName).push({ original: callback, wrapper: safeCallback });
+
+      this.socket.on(eventName, safeCallback);
+      return true;
+    } catch (error) {
+      console.error(`Error adding listener for event '${eventName}':`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Supprimer un écouteur d'événement spécifique
+   * @param {string} eventName - Nom de l'événement
+   * @param {Function} callback - Fonction de rappel à supprimer
+   */
+  off(eventName, callback) {
+    if (!this.socket || !this.listeners.has(eventName)) {
+      return;
+    }
+
+    const callbacks = this.listeners.get(eventName);
+    
+    if (callback) {
+      // Trouver le callback et son wrapper
+      const callbackIndex = callbacks.findIndex(item => item.original === callback);
+      
+      if (callbackIndex !== -1) {
+        // Récupérer le wrapper pour le désabonnement
+        const wrapper = callbacks[callbackIndex].wrapper;
+        this.socket.off(eventName, wrapper);
+        
+        // Retirer de la liste des callbacks
+        callbacks.splice(callbackIndex, 1);
+        
+      }
+    } else {
+      // Supprimer tous les callbacks pour cet événement
+      this.clearListeners(eventName);
+    }
+  }
+
+  /**
+   * Supprimer tous les écouteurs d'un événement
+   * @param {string} eventName - Nom de l'événement
+   */
+  clearListeners(eventName) {
+    if (!this.socket || !this.listeners.has(eventName)) {
+      return;
+    }
+    
+    
+    const callbacks = this.listeners.get(eventName);
+    callbacks.forEach(callbackObj => {
+      // Utiliser le wrapper stocké pour désabonner
+      if (callbackObj && callbackObj.wrapper) {
+        this.socket.off(eventName, callbackObj.wrapper);
+      }
+    });
+    
+    this.listeners.delete(eventName);
+  }
+
+  /**
+   * Supprimer tous les écouteurs d'événements
+   */
+  clearAllListeners() {
+    if (this.socket) {
+
+      for (const [eventName, callbacks] of this.listeners.entries()) {
+        
+        callbacks.forEach(callbackObj => {
+          // Utiliser le wrapper stocké pour désabonner
+          if (callbackObj && callbackObj.wrapper) {
+            this.socket.off(eventName, callbackObj.wrapper);
+          }
+        });
+      }
+      
+      this.listeners.clear();
+    }
+  }
+}
+
+export default BaseSocketService;
+</file>
+
+<file path="frontend/src/services/socket/GamesSocketService.js">
+import BaseSocketService from './BaseSocketService';
+
+/**
+ * Service pour les sockets liés aux jeux
+ */
+class GamesSocketService extends BaseSocketService {
+  constructor() {
+    super('games');
+    this.activeGame = null;
+    this.activeGameType = null;
+  }
+
+  /**
+   * Rejoindre le lobby d'un jeu
+   * @param {string} gameType - Type de jeu (ex: 'ticTacToe')
+   */
+  async joinLobby(gameType) {
+    try {
+      const eventName = `join${gameType.charAt(0).toUpperCase() + gameType.slice(1)}Lobby`;
+      await this.emit(eventName);
+      this.activeGameType = gameType;
+    } catch (error) {
+      console.error(`Error joining lobby for ${gameType}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Créer une partie
+   * @param {string} gameType - Type de jeu (ex: 'ticTacToe')
+   */
+  async createGame(gameType) {
+    try {
+      const eventName = `create${gameType.charAt(0).toUpperCase() + gameType.slice(1)}Game`;
+      await this.emit(eventName);
+      this.activeGameType = gameType;
+    } catch (error) {
+      console.error(`Error creating game of type ${gameType}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Rejoindre une partie
+   * @param {string} gameType - Type de jeu (ex: 'ticTacToe')
+   * @param {string} gameId - ID de la partie
+   */
+  async joinGame(gameType, gameId) {
+    try {
+      const eventName = `join${gameType.charAt(0).toUpperCase() + gameType.slice(1)}Game`;
+      await this.emit(eventName, { gameId });
+      this.activeGame = gameId;
+      this.activeGameType = gameType;
+    } catch (error) {
+      console.error(`Error joining game ${gameId} of type ${gameType}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Jouer un coup
+   * @param {string} gameType - Type de jeu (ex: 'ticTacToe')
+   * @param {string} gameId - ID de la partie
+   * @param {*} moveData - Données du coup (dépend du jeu)
+   */
+  async playMove(gameType, gameId, moveData) {
+    try {
+      const eventName = `play${gameType.charAt(0).toUpperCase() + gameType.slice(1)}Move`;
+      await this.emit(eventName, {
+        gameId,
+        ...moveData
+      });
+    } catch (error) {
+      console.error(`Error playing move in game ${gameId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Quitter une partie
+   * @param {string} gameType - Type de jeu (ex: 'ticTacToe')
+   * @param {string} gameId - ID de la partie
+   */
+  async leaveGame(gameType, gameId) {
+    try {
+      const eventName = `leave${gameType.charAt(0).toUpperCase() + gameType.slice(1)}Game`;
+      await this.emit(eventName, { gameId });
+      this.activeGame = null;
+    } catch (error) {
+      console.error(`Error leaving game ${gameId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Nettoyer les écouteurs spécifiques à un jeu
+   * @param {string} gameType - Type de jeu (ex: 'ticTacToe')
+   */
+  clearGameListeners(gameType) {
+    // Événements génériques pour tous les jeux
+    const genericEvents = [
+      'gameCreated',
+      'gameStarted',
+      'gameError'
+    ];
+
+    // Événements spécifiques au type de jeu
+    const specificEvents = {
+      ticTacToe: [
+        'lobbyUpdate',
+        'newGameAvailable',
+        'gameRemoved',
+        'boardUpdated',
+        'gameWon',
+        'gameDraw',
+        'playerLeft',
+        'availableGames'
+      ]
+    };
+
+    // Nettoyer les écouteurs génériques
+    genericEvents.forEach(event => this.clearListeners(event));
+
+    // Nettoyer les écouteurs spécifiques au jeu
+    if (specificEvents[gameType]) {
+      specificEvents[gameType].forEach(event => this.clearListeners(event));
+    }
+  }
+}
+
+// Exporter une instance unique
+export default new GamesSocketService();
+</file>
+
+<file path="frontend/src/services/socket/index.js">
+import BaseSocketService from './BaseSocketService';
+import GamesSocketService from './GamesSocketService';
+import TicTacToeService from './TicTacToeService';
+
+/**
+ * Fonction pour nettoyer toutes les connexions socket
+ */
+const cleanupAllSocketConnections = () => {
+  // Déconnexion des services instanciés
+  GamesSocketService.disconnect();
+};
+
+export {
+  BaseSocketService,
+  GamesSocketService,
+  TicTacToeService,
+  cleanupAllSocketConnections
+};
+</file>
+
+<file path="frontend/src/services/socket/TicTacToeService.js">
+import GamesSocketService from './GamesSocketService';
+
+/**
+ * Service spécifique pour le jeu de Morpion
+ */
+class TicTacToeService {
+  constructor() {
+    this.gamesSocket = GamesSocketService;
+    this.gameType = 'ticTacToe';
+  }
+
+  /**
+   * Se connecter au serveur de jeux
+   * @returns {Promise} Résolution lorsque connecté
+   */
+  async connect() {
+    return await this.gamesSocket.connect();
+  }
+
+  /**
+   * Rejoindre le lobby du morpion
+   */
+  async joinLobby() {
+    try {
+      await this.gamesSocket.joinLobby(this.gameType);
+    } catch (error) {
+      console.error('Error joining TicTacToe lobby:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Créer une nouvelle partie
+   */
+  async createGame() {
+    try {
+      await this.gamesSocket.createGame(this.gameType);
+    } catch (error) {
+      console.error('Error creating TicTacToe game:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Rejoindre une partie existante
+   * @param {string} gameId - ID de la partie
+   */
+  async joinGame(gameId) {
+    try {
+      if (!gameId || typeof gameId !== 'string') {
+        throw new Error(`Invalid gameId: ${gameId}`);
+      }
+
+      // Vérifier que gameId est bien une chaîne non vide
+      if (!gameId || typeof gameId !== 'string' || gameId.trim() === '') {
+        throw new Error('Game ID must be a non-empty string');
+      }
+
+      await this.gamesSocket.joinGame(this.gameType, gameId.trim());
+    } catch (error) {
+      console.error(`Error joining TicTacToe game ${gameId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Jouer un coup
+   * @param {string} gameId - ID de la partie
+   * @param {number} position - Position sur le plateau (0-8)
+   */
+  async playMove(gameId, position) {
+    try {
+      if (!gameId) {
+        console.error('Cannot play move: gameId is undefined or null');
+        throw new Error('Game ID is required to play a move');
+      }
+
+      await this.gamesSocket.playMove(this.gameType, gameId, { position });
+    } catch (error) {
+      console.error(`Error playing move in game ${gameId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Quitter une partie
+   * @param {string} gameId - ID de la partie
+   */
+  async leaveGame(gameId) {
+    try {
+      await this.gamesSocket.leaveGame(this.gameType, gameId);
+    } catch (error) {
+      console.error(`Error leaving game ${gameId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Écouter les mises à jour du lobby
+   * @param {Function} callback - Fonction de rappel
+   */
+  onLobbyUpdate(callback) {
+    this.gamesSocket.on('lobbyUpdate', callback);
+  }
+
+  /**
+   * Écouter les nouvelles parties disponibles
+   * @param {Function} callback - Fonction de rappel
+   */
+  onNewGameAvailable(callback) {
+    this.gamesSocket.on('newGameAvailable', callback);
+  }
+
+  /**
+   * Écouter les parties qui ont été retirées
+   * @param {Function} callback - Fonction de rappel
+   */
+  onGameRemoved(callback) {
+    this.gamesSocket.on('gameRemoved', callback);
+  }
+
+  /**
+   * Écouter la liste des parties disponibles à l'entrée du lobby
+   * @param {Function} callback - Fonction de rappel
+   */
+  onAvailableGames(callback) {
+    this.gamesSocket.on('availableGames', callback);
+  }
+
+  /**
+   * Écouter la création d'une partie
+   * @param {Function} callback - Fonction de rappel
+   */
+  onGameCreated(callback) {
+    this.gamesSocket.on('gameCreated', callback);
+  }
+
+  /**
+   * Écouter le démarrage d'une partie
+   * @param {Function} callback - Fonction de rappel
+   */
+  onGameStarted(callback) {
+    this.gamesSocket.on('gameStarted', callback);
+  }
+
+  /**
+   * Écouter les mises à jour du plateau
+   * @param {Function} callback - Fonction de rappel
+   */
+  onBoardUpdated(callback) {
+    this.gamesSocket.on('boardUpdated', callback);
+  }
+
+  /**
+   * Écouter les victoires
+   * @param {Function} callback - Fonction de rappel
+   */
+  onGameWon(callback) {
+    this.gamesSocket.on('gameWon', callback);
+  }
+
+  /**
+   * Écouter les matchs nuls
+   * @param {Function} callback - Fonction de rappel
+   */
+  onGameDraw(callback) {
+    this.gamesSocket.on('gameDraw', callback);
+  }
+
+  /**
+   * Écouter le départ d'un joueur
+   * @param {Function} callback - Fonction de rappel
+   */
+  onPlayerLeft(callback) {
+    this.gamesSocket.on('playerLeft', callback);
+  }
+
+  /**
+   * Écouter les erreurs de jeu
+   * @param {Function} callback - Fonction de rappel
+   */
+  onGameError(callback) {
+    this.gamesSocket.on('gameError', callback);
+  }
+
+  /**
+   * Nettoyer tous les écouteurs spécifiques au jeu
+   */
+  clearListeners() {
+    this.gamesSocket.clearGameListeners(this.gameType);
+  }
+
+  /**
+   * Se déconnecter du serveur de jeux
+   */
+  disconnect() {
+    this.clearListeners();
+  }
+}
+
+// Exporter une instance unique
+export default new TicTacToeService();
+</file>
+
+<file path="frontend/src/services/socketService.js">
+import { io } from 'socket.io-client';
+
+/**
+ * Service pour gérer les connexions WebSocket
+ */
+class SocketService {
+  constructor() {
+    this.socket = null;
+    this.gamesSocket = null;
+    this.isConnected = false;
+    this.isGamesConnected = false;
+    this.gameListeners = new Map();
+  }
+
+  /**
+   * Connecter au serveur socket.io principal
+   * @returns {Promise} Résolution lorsque connecté
+   */
+  connect() {
+    return new Promise((resolve, reject) => {
+      if (this.isConnected) {
+        return resolve(this.socket);
+      }
+
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        return reject(new Error('No authentication token available'));
+      }
+
+      this.socket = io('http://localhost:3002', {
+        auth: { token }
+      });
+
+      this.socket.on('connect', () => {
+        this.isConnected = true;
+        resolve(this.socket);
+      });
+
+      this.socket.on('connect_error', (error) => {
+        console.error('Socket connection error:', error);
+        reject(error);
+      });
+
+      this.socket.on('disconnect', () => {
+        this.isConnected = false;
+      });
+    });
+  }
+
+  /**
+   * Connecter au namespace des jeux
+   * @returns {Promise} Résolution lorsque connecté
+   */
+  connectToGames() {
+    return new Promise((resolve, reject) => {
+      if (this.isGamesConnected) {
+        return resolve(this.gamesSocket);
+      }
+
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        return reject(new Error('No authentication token available'));
+      }
+
+      this.gamesSocket = io('http://localhost:3002/games', {
+        auth: { token }
+      });
+
+      this.gamesSocket.on('connect', () => {
+        this.isGamesConnected = true;
+        resolve(this.gamesSocket);
+      });
+
+      this.gamesSocket.on('connect_error', (error) => {
+        console.error('Games socket connection error:', error);
+        reject(error);
+      });
+
+      this.gamesSocket.on('disconnect', () => {
+        this.isGamesConnected = false;
+      });
+    });
+  }
+
+  /**
+   * Déconnecter tous les sockets
+   */
+  disconnect() {
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
+      this.isConnected = false;
+    }
+
+    if (this.gamesSocket) {
+      this.gamesSocket.disconnect();
+      this.gamesSocket = null;
+      this.isGamesConnected = false;
+    }
+  }
+
+  /**
+   * Rejoindre le lobby de morpion
+   */
+  joinTicTacToeLobby() {
+    if (!this.isGamesConnected) {
+      return Promise.reject(new Error('Not connected to games namespace'));
+    }
+    this.gamesSocket.emit('joinTicTacToeLobby');
+  }
+
+  /**
+   * Créer une nouvelle partie de morpion
+   */
+  createTicTacToeGame() {
+    if (!this.isGamesConnected) {
+      return Promise.reject(new Error('Not connected to games namespace'));
+    }
+    this.gamesSocket.emit('createTicTacToeGame');
+  }
+
+  /**
+   * Rejoindre une partie existante
+   * @param {string} gameId - ID de la partie à rejoindre
+   */
+  joinTicTacToeGame(gameId) {
+    if (!this.isGamesConnected) {
+      return Promise.reject(new Error('Not connected to games namespace'));
+    }
+    this.gamesSocket.emit('joinTicTacToeGame', { gameId });
+  }
+
+  /**
+   * Jouer un coup dans une partie de morpion
+   * @param {string} gameId - ID de la partie
+   * @param {number} position - Position sur le plateau (0-8)
+   */
+  playTicTacToeMove(gameId, position) {
+    if (!this.isGamesConnected) {
+      return Promise.reject(new Error('Not connected to games namespace'));
+    }
+    this.gamesSocket.emit('playTicTacToeMove', { gameId, position });
+  }
+
+  /**
+   * Quitter une partie de morpion
+   * @param {string} gameId - ID de la partie à quitter
+   */
+  leaveTicTacToeGame(gameId) {
+    if (!this.isGamesConnected) {
+      return Promise.reject(new Error('Not connected to games namespace'));
+    }
+    this.gamesSocket.emit('leaveTicTacToeGame', { gameId });
+  }
+
+  /**
+   * Ajouter un écouteur d'événement pour le socket des jeux
+   * @param {string} event - Nom de l'événement
+   * @param {Function} callback - Fonction de rappel
+   */
+  onGameEvent(event, callback) {
+    if (!this.isGamesConnected) {
+      return;
+    }
+
+    // Stocker la référence du callback pour pouvoir le supprimer plus tard
+    if (!this.gameListeners.has(event)) {
+      this.gameListeners.set(event, []);
+    }
+    this.gameListeners.get(event).push(callback);
+
+    this.gamesSocket.on(event, callback);
+  }
+
+  /**
+   * Supprimer tous les écouteurs d'un événement
+   * @param {string} event - Nom de l'événement
+   */
+  offGameEvent(event) {
+    if (!this.isGamesConnected || !this.gameListeners.has(event)) {
+      return;
+    }
+    
+    const callbacks = this.gameListeners.get(event);
+    callbacks.forEach(callback => {
+      this.gamesSocket.off(event, callback);
+    });
+    
+    this.gameListeners.delete(event);
+  }
+
+  /**
+   * Supprimer tous les écouteurs d'événements
+   */
+  clearAllListeners() {
+    if (this.gamesSocket) {
+      for (const [event, callbacks] of this.gameListeners.entries()) {
+        callbacks.forEach(callback => {
+          this.gamesSocket.off(event, callback);
+        });
+      }
+      this.gameListeners.clear();
+    }
+  }
+}
+
+// Exporter une instance unique du service
+export default new SocketService();
+</file>
+
+<file path="frontend/src/services/walletService.js">
+import api from './api.js';
+
+/**
+ * Service pour la gestion du portefeuille
+ */
+const walletService = {
+    /**
+     * Obtenir les informations du portefeuille de l'utilisateur connecté
+     * @returns {Promise} - Promesse contenant les informations du portefeuille
+     */
+    getMyWallet: async () => {
+        return await api.get('/wallet/me');
+    },
+
+    /**
+     * Obtenir l'historique des transactions de l'utilisateur connecté
+     * @param {Object} options - Options de pagination
+     * @returns {Promise} - Promesse contenant l'historique des transactions
+     */
+    getMyTransactions: async (options = {}) => {
+        const queryParams = new URLSearchParams();
+        
+        if (options.page) queryParams.append('page', options.page);
+        if (options.limit) queryParams.append('limit', options.limit);
+        
+        const queryString = queryParams.toString();
+        return await api.get(`/wallet/transactions${queryString ? `?${queryString}` : ''}`);
+    },
+
+    /**
+     * Vérifier si l'utilisateur peut placer un pari
+     * @param {number} amount - Montant à vérifier
+     * @returns {Promise} - Promesse indiquant si l'utilisateur peut placer le pari
+     */
+    canPlaceBet: async (amount) => {
+        return await api.post('/wallet/bet/check', { amount });
+    },
+
+    /**
+     * Placer un pari
+     * @param {string} gameId - ID de la partie
+     * @param {number} amount - Montant du pari
+     * @param {string} gameType - Type de jeu
+     * @returns {Promise} - Promesse contenant le résultat de l'opération
+     */
+    placeBet: async (gameId, amount, gameType) => {
+        return await api.post('/wallet/bet/place', { gameId, amount, gameType });
+    },
+
+    /**
+     * Réclamer des gains
+     * @param {string} gameId - ID de la partie
+     * @param {number} amount - Montant des gains
+     * @param {string} gameType - Type de jeu
+     * @returns {Promise} - Promesse contenant le résultat de l'opération
+     */
+    claimWinnings: async (gameId, amount, gameType) => {
+        return await api.post('/wallet/winnings/claim', { gameId, amount, gameType });
+    },
+
+    /**
+     * Collecter le bonus quotidien
+     * @returns {Promise} - Promesse contenant le résultat de l'opération
+     */
+    collectDailyBonus: async () => {
+        return await api.post('/wallet/bonus/daily');
+    }
+};
+
+export default walletService;
+</file>
+
+<file path="frontend/src/styles/auth.css">
+/* Styles pour les pages d'authentification (login, register) */
+.auth-container {
+  max-width: 400px;
+  margin: 60px auto;
+  padding: 30px;
+  background-color: var(--card-background);
+  border-radius: 8px;
+  box-shadow: var(--box-shadow);
+}
+
+.auth-title {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.auth-link {
+  display: block;
+  text-align: center;
+  margin-top: 16px;
+}
+
+.form-submit {
+  width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Page 404 */
+.not-found {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .auth-container {
+    max-width: 100%;
+    margin: 40px 20px;
+  }
+}
+</file>
+
+<file path="frontend/src/styles/base.css">
+/* Variables et styles de base */
+:root {
+  --primary-color: #4a56e2;
+  --secondary-color: #6c7ae0;
+  --accent-color: #8a2be2;
+  --background-color: #f5f7f9;
+  --text-color: #333;
+  --error-color: #e74c3c;
+  --success-color: #2ecc71;
+  --warning-color: #f39c12;
+  --info-color: #3498db;
+  --card-background: #fff;
+  --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+  background-color: var(--background-color);
+  color: var(--text-color);
+  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#app {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  width: 100%;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin-bottom: 1rem;
+  color: var(--primary-color);
+}
+
+a {
+  color: var(--primary-color);
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+a:hover {
+  color: var(--accent-color);
+}
+
+button {
+  cursor: pointer;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-size: 16px;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: var(--accent-color);
+}
+
+button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+input, textarea, select {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 16px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.card {
+  background: var(--card-background);
+  border-radius: 8px;
+  box-shadow: var(--box-shadow);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.error-message {
+  color: var(--error-color);
+  margin-top: -10px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.success-message {
+  color: var(--success-color);
+  margin-bottom: 16px;
+}
+
+/* Boutons avec différentes couleurs */
+.primary-btn {
+  background-color: var(--primary-color);
+}
+
+.secondary-btn {
+  background-color: var(--secondary-color);
+}
+
+.danger-btn {
+  background-color: var(--error-color);
+}
+
+.primary-btn:hover, .secondary-btn:hover, .danger-btn:hover {
+  opacity: 0.9;
+}
+
+/* Spinner de chargement */
+.spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top: 3px solid white;
+  animation: spin 1s linear infinite;
+  margin-left: 8px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Notifications */
+.notifications-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 300px;
+  max-width: 100%;
+  z-index: 1000;
+}
+
+.notification {
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 10px;
+  color: white;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  animation: slideIn 0.3s ease-out;
+  transition: opacity 0.5s ease-out;
+}
+
+.notification-info {
+  background-color: var(--info-color);
+}
+
+.notification-success {
+  background-color: var(--success-color);
+}
+
+.notification-error {
+  background-color: var(--error-color);
+}
+
+.notification-warning {
+  background-color: var(--warning-color);
+}
+
+.notification.fade-out {
+  opacity: 0;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 15px;
+  }
+}
+</file>
+
+<file path="frontend/src/styles/home.css">
+/* Styles pour la page d'accueil */
+.home-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.home-title {
+  font-size: 2.5rem;
+  text-align: center;
+  margin-bottom: 10px;
+  color: var(--primary-color);
+}
+
+.accent-text {
+  color: var(--accent-color);
+}
+
+.home-subtitle {
+  font-size: 1.2rem;
+  text-align: center;
+  color: #666;
+  margin-bottom: 40px;
+}
+
+/* Profile section */
+.profile-section {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+.user-card,
+.wallet-card {
+  flex: 1;
+  border-radius: 10px;
+  background-color: white;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+}
+
+.card-title {
+  margin-bottom: 15px;
+  color: var(--primary-color);
+  font-weight: bold;
+}
+
+.wallet-title {
+  color: var(--primary-color);
+  margin-bottom: 10px;
+}
+
+.wallet-balance {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.balance-amount {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: var(--primary-color);
+  margin-right: 8px;
+}
+
+.balance-currency {
+  font-size: 1.2rem;
+  color: #666;
+}
+
+.wallet-actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.bonus-btn {
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.bonus-btn:hover {
+  background-color: var(--primary-color);
+  transform: translateY(-2px);
+}
+
+.disabled-btn {
+  background-color: #cccccc;
+  color: #666666;
+  cursor: not-allowed;
+}
+
+.disabled-btn:hover {
+  background-color: #cccccc;
+  transform: none;
+}
+
+/* Games section */
+.games-section {
+  margin-bottom: 40px;
+}
+
+.section-title {
+  text-align: center;
+  margin-bottom: 30px;
+  color: var(--primary-color);
+  font-size: 1.8rem;
+}
+
+.games-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 25px;
+}
+
+.game-card {
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  padding: 25px;
+  text-align: center;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.game-card:hover:not(.coming-soon) {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.game-icon {
+  font-size: 48px;
+  margin-bottom: 15px;
+}
+
+.game-title {
+  margin-bottom: 10px;
+  color: var(--primary-color);
+}
+
+.game-description {
+  margin-bottom: 20px;
+  color: #666;
+  flex-grow: 1;
+}
+
+.game-details {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20px;
+  font-size: 0.9rem;
+}
+
+.game-price {
+  margin-bottom: 5px;
+  color: #666;
+}
+
+.game-reward {
+  color: var(--success-color);
+  font-weight: bold;
+}
+
+.coming-soon {
+  opacity: 0.7;
+}
+
+.coming-soon:hover {
+  transform: none;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.home-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+}
+
+/* Spinner for loading states */
+.spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top: 3px solid white;
+  animation: spin 1s linear infinite;
+  margin-left: 8px;
+}
+
+.user-info .spinner,
+.wallet-info .spinner {
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-top: 3px solid var(--primary-color);
+  display: block;
+  margin: 20px auto;
+  width: 30px;
+  height: 30px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .profile-section {
+    flex-direction: column;
+  }
+  
+  .home-title {
+    font-size: 2rem;
+  }
+  
+  .games-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</file>
+
+<file path="frontend/src/styles/index.css">
+/* Fichier principal qui importe tous les autres fichiers CSS */
+@import './base.css';
+@import './navbar.css';
+@import './auth.css';
+@import './welcome.css';
+@import './home.css';
+@import './ticTacToe.css';
+</file>
+
+<file path="frontend/src/styles/navbar.css">
+/* Styles pour la barre de navigation */
+.navbar {
+  background-color: var(--primary-color);
+  color: white;
+  padding: 15px 0;
+}
+
+.nav-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.nav-brand {
+  font-size: 24px;
+  font-weight: bold;
+  color: white;
+}
+
+.nav-links {
+  display: flex;
+  gap: 20px;
+}
+
+.nav-link {
+  color: white;
+  font-weight: 500;
+}
+
+.nav-link:hover {
+  color: #f0f0f0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .nav-container {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .nav-links {
+    margin-top: 10px;
+  }
+}
+</file>
+
+<file path="frontend/src/styles/ticTacToe.css">
+/* Styles pour le jeu de morpion */
+.game-container {
+  max-width: 600px;
+  margin: 30px auto;
+  padding: 20px;
+  background-color: var(--card-background);
+  border-radius: 8px;
+  box-shadow: var(--box-shadow);
+}
+
+.game-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.game-status {
+  font-size: 18px;
+  color: var(--primary-color);
+  font-weight: bold;
+}
+
+.game-actions {
+  margin: 25px 0;
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
+
+.ttt-board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 10px;
+  width: 300px;
+  height: 300px;
+  margin: 0 auto 20px;
+}
+
+.ttt-cell {
+  background-color: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  font-weight: bold;
+  border-radius: 5px;
+  cursor: default;
+  transition: all 0.2s ease;
+}
+
+.ttt-cell.clickable {
+  cursor: pointer;
+}
+
+.ttt-cell.clickable:hover {
+  background-color: #e0e0e0;
+}
+
+.cell-x {
+  color: #e74c3c;
+}
+
+.cell-o {
+  color: #3498db;
+}
+
+.game-info {
+  display: flex;
+  justify-content: space-around;
+  margin: 20px 0;
+}
+
+.player-info {
+  background-color: #f0f0f0;
+  padding: 10px 15px;
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 120px;
+}
+
+.current-player {
+  background-color: #e0f7fa;
+  border: 2px solid var(--primary-color);
+}
+
+.player-name {
+  font-weight: bold;
+}
+
+.player-symbol {
+  font-size: 14px;
+  color: #666;
+}
+
+.you-tag {
+  background-color: var(--accent-color);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.game-loading {
+  text-align: center;
+  padding: 40px;
+}
+
+.game-loading .spinner {
+  margin: 20px auto;
+  display: block;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-top: 3px solid var(--primary-color);
+  width: 40px;
+  height: 40px;
+}
+
+.games-list {
+  margin-top: 20px;
+}
+
+.game-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background-color: #f0f0f0;
+  border-radius: 5px;
+  margin-bottom: 10px;
+}
+
+.no-games {
+  text-align: center;
+  color: #666;
+  padding: 20px 0;
+}
+
+.available-games h2 {
+  margin-top: 30px;
+  text-align: center;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .ttt-board {
+    width: 250px;
+    height: 250px;
+  }
+  
+  .ttt-cell {
+    font-size: 36px;
+  }
+  
+  .game-container {
+    margin: 20px 10px;
+    padding: 15px;
+  }
+  
+  .game-info {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .player-info {
+    width: 100%;
+  }
+}
+</file>
+
+<file path="frontend/src/styles/welcome.css">
+/* Styles pour la page d'accueil */
+.welcome-container {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.welcome-title {
+  font-size: 2.5rem;
+  margin-bottom: 16px;
+}
+
+.welcome-subtitle {
+  font-size: 1.2rem;
+  color: #666;
+  margin-bottom: 32px;
+}
+
+.user-info {
+  background-color: var(--card-background);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: var(--box-shadow);
+  max-width: 500px;
+  margin: 0 auto 30px auto;
+  text-align: left;
+}
+
+.games-showcase {
+  margin: 40px 0;
+}
+
+.games-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.game-card {
+  background-color: var(--card-background);
+  border-radius: 8px;
+  box-shadow: var(--box-shadow);
+  padding: 25px;
+  width: 300px;
+  text-align: center;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.game-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.game-card h3 {
+  margin-bottom: 10px;
+  color: var(--primary-color);
+}
+
+.game-card p {
+  margin-bottom: 20px;
+  color: #666;
+}
+
+.welcome-actions {
+  margin-top: 30px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .welcome-title {
+    font-size: 2rem;
+  }
+  
+  .game-card {
+    width: 100%;
+    max-width: 300px;
+  }
+}
 </file>
 
 <file path=".gitignore">
@@ -108,6 +3933,14 @@ backend/.env
 backend/node_modules
 backend/logs
 backend/dist
+</file>
+
+<file path=".repomix.yml">
+name: gamecenter_js
+exclude:
+  - node_modules/**
+  - dist/**
+  - .git/**
 </file>
 
 <file path="backend/.gitignore">
@@ -185,6 +4018,7 @@ module.exports = {
     "http-status": "^2.0.0",
     "httpstatus": "^1.0.0",
     "joi": "^17.13.3",
+    "jsonwebtoken": "^9.0.2",
     "lodash": "^4.17.21",
     "moment": "^2.30.1",
     "mongoose": "^8.8.3",
@@ -193,6 +4027,7 @@ module.exports = {
     "nodemon": "^3.1.7",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "socket.io": "^4.7.4",
     "uuid": "^11.1.0",
     "winston": "^3.17.0"
   }
@@ -604,255 +4439,6 @@ passport.use(
 );
 
 export default passport;
-</file>
-
-<file path="backend/src/controllers/authController.js">
-import APIError from '~/utils/apiError';
-import tokenService from '~/services/tokenService';
-import emailService from '~/services/emailService';
-import User from '~/models/userModel';
-import config from '~/config/config';
-import httpStatus from 'http-status';
-import Token from '~/models/tokenModel';
-import Role from '~/models/roleModel';
-
-export const signup = async (req, res) => {
-	const role = await Role.getRoleByName('User');
-	req.body.roles = [role.id];
-	const user = await User.createUser(req.body);
-	const tokens = await tokenService.generateAuthTokens(user);
-	return res.json({
-		success: true,
-		data: { user, tokens }
-	});
-};
-
-export const signin = async (req, res) => {
-	const user = await User.getUserByUserName(req.body.userName);
-	if (!user || !(await user.isPasswordMatch(req.body.password))) {
-		throw new APIError('Incorrect user name or password', httpStatus.BAD_REQUEST);
-	}
-	const tokens = await tokenService.generateAuthTokens(user);
-	return res.json({
-		success: true,
-		data: { user, tokens }
-	});
-};
-
-export const current = async (req, res) => {
-	const user = await User.getUser(req.user.id);
-	if (!user) {
-		throw new APIError('User not found', httpStatus.NOT_FOUND);
-	}
-	return res.json({
-		success: true,
-		data: {
-			firstName: user.firstName,
-			lastName: user.lastName,
-			userName: user.userName,
-			avatarUrl: user.avatarUrl
-		}
-	});
-};
-
-export const getMe = async (req, res) => {
-	const user = await User.getUserWithRoles(req.user.id);
-	if (!user) {
-		throw new APIError('User not found', httpStatus.NOT_FOUND);
-	}
-	return res.json({
-		success: true,
-		data: user
-	});
-};
-
-export const updateMe = async (req, res) => {
-	const user = await User.updateUser(req.user.id, req.body);
-	return res.json({
-		success: true,
-		data: user
-	});
-};
-
-export const signout = async (req, res) => {
-	await Token.revokeToken(req.body.refreshToken, config.TOKEN_TYPES.REFRESH);
-	return res.json({
-		success: true,
-		data: 'Signout success'
-	});
-};
-
-export const refreshTokens = async (req, res) => {
-	try {
-		const refreshTokenDoc = await tokenService.verifyToken(req.body.refreshToken, config.TOKEN_TYPES.REFRESH);
-		const user = await User.getUser(refreshTokenDoc.user);
-		if (!user) {
-			throw new Error();
-		}
-		await refreshTokenDoc.remove();
-		const tokens = await tokenService.generateAuthTokens(user);
-		return res.json({
-			success: true,
-			data: {
-				tokens
-			}
-		});
-	} catch (err) {
-		throw new APIError(err.message, httpStatus.UNAUTHORIZED);
-	}
-};
-
-export const sendVerificationEmail = async (req, res) => {
-	const user = await User.getUserByEmail(req.user.email);
-	if (user.confirmed) {
-		throw new APIError('Email verified', httpStatus.BAD_REQUEST);
-	}
-	const verifyEmailToken = await tokenService.generateVerifyEmailToken(req.user);
-	await emailService.sendVerificationEmail(req.user.email, verifyEmailToken);
-	return res.json({
-		success: true,
-		data: 'Send verification email success'
-	});
-};
-
-export const verifyEmail = async (req, res) => {
-	try {
-		const verifyEmailTokenDoc = await tokenService.verifyToken(req.query.token, config.TOKEN_TYPES.VERIFY_EMAIL);
-		const user = await User.getUser(verifyEmailTokenDoc.user);
-		if (!user) {
-			throw new Error();
-		}
-		await Token.deleteMany({ user: user.id, type: config.TOKEN_TYPES.VERIFY_EMAIL });
-		await User.updateUser(user.id, { confirmed: true });
-		return res.json({
-			success: true,
-			data: 'Verify email success'
-		});
-	} catch (err) {
-		throw new APIError('Email verification failed', httpStatus.UNAUTHORIZED);
-	}
-};
-
-export const forgotPassword = async (req, res) => {
-	const resetPasswordToken = await tokenService.generateResetPasswordToken(req.body.email);
-	await emailService.sendResetPasswordEmail(req.body.email, resetPasswordToken);
-	return res.json({
-		success: true,
-		data: 'Send forgot password email success'
-	});
-};
-
-export const resetPassword = async (req, res) => {
-	try {
-		const resetPasswordTokenDoc = await tokenService.verifyToken(req.query.token, config.TOKEN_TYPES.RESET_PASSWORD);
-		const user = await User.getUser(resetPasswordTokenDoc.user);
-		if (!user) {
-			throw new Error();
-		}
-		await Token.deleteMany({ user: user.id, type: config.TOKEN_TYPES.RESET_PASSWORD });
-		await User.updateUser(user.id, { password: req.body.password });
-		return res.json({
-			success: true,
-			data: 'Reset password success'
-		});
-	} catch (err) {
-		throw new APIError('Password reset failed', httpStatus.UNAUTHORIZED);
-	}
-};
-
-export default {
-	signup,
-	signin,
-	current,
-	getMe,
-	updateMe,
-	signout,
-	refreshTokens,
-	sendVerificationEmail,
-	verifyEmail,
-	forgotPassword,
-	resetPassword
-};
-</file>
-
-<file path="backend/src/controllers/roleController.js">
-import _ from 'lodash';
-import APIError from '~/utils/apiError';
-import User from '~/models/userModel';
-import Role from '~/models/roleModel';
-import httpStatus from 'http-status';
-
-export const createRole = async (req, res) => {
-	const role = await Role.createRole(req.body);
-	return res.status(200).json({
-		success: true,
-		data: role
-	});
-};
-
-export const getRole = async (req, res) => {
-	const role = await Role.getRoleById(req.params.roleId);
-	if (!role) {
-		throw new APIError('Role not found', httpStatus.NOT_FOUND);
-	}
-	return res.json({
-		success: true,
-		data: role
-	});
-};
-
-export const updateRole = async (req, res) => {
-	const role = await Role.updateRoleById(req.params.roleId, req.body);
-	return res.json({
-		success: true,
-		data: role
-	});
-};
-
-export const getRoles = async (req, res) => {
-	const filters = _.pick(req.query, ['q']);
-	const options = _.pick(req.query, ['limit', 'page', 'sortBy', 'sortDirection']);
-	const roles = await Role.paginate(
-		options,
-		'permissions',
-		filters.q && {
-			$or: [
-				{
-					name: {
-						$regex: filters.q,
-						$options: 'i'
-					}
-				},
-				{
-					description: {
-						$regex: filters.q,
-						$options: 'i'
-					}
-				}
-			]
-		}
-	);
-	return res.json({
-		success: true,
-		data: roles.results,
-		pagination: {
-			total: roles.totalResults
-		}
-	});
-};
-
-export const deleteRole = async (req, res) => {
-	if (await User.isRoleIdAlreadyExists(req.params.roleId)) {
-		throw new APIError('A role cannot be deleted if associated with users', httpStatus.BAD_REQUEST);
-	}
-	await Role.deleteRoleById(req.params.roleId);
-	return res.json({
-		success: true,
-		data: {}
-	});
-};
-
-export default { createRole, getRole, updateRole, getRoles, deleteRole };
 </file>
 
 <file path="backend/src/controllers/userController.js">
@@ -1320,254 +4906,6 @@ const Role = mongoose.model('roles', roleSchema);
 export default Role;
 </file>
 
-<file path="backend/src/models/tokenModel.js">
-import httpStatus from 'http-status';
-import mongoose from 'mongoose';
-import config from '~/config/config';
-import APIError from '~/utils/apiError';
-import toJSON from './plugins/toJSONPlugin';
-
-const tokenSchema = mongoose.Schema(
-	{
-		user: {
-			type: mongoose.SchemaTypes.ObjectId,
-			ref: 'users',
-			required: true
-		},
-		token: {
-			type: String,
-			required: true,
-			index: true
-		},
-		type: {
-			type: String,
-			enum: [config.TOKEN_TYPES.REFRESH, config.TOKEN_TYPES.RESET_PASSWORD, config.TOKEN_TYPES.VERIFY_EMAIL],
-			required: true
-		},
-		blacklisted: {
-			type: Boolean,
-			default: false
-		},
-		expiresAt: {
-			type: Date,
-			required: true
-		}
-	},
-	{
-		timestamps: true
-	}
-);
-
-tokenSchema.plugin(toJSON);
-
-class TokenClass {
-	static async saveToken(token, userId, expires, type, blacklisted = false) {
-		const tokenDoc = await this.create({
-			user: userId,
-			token,
-			type,
-			expiresAt: expires,
-			blacklisted
-		});
-		return tokenDoc;
-	}
-
-	static async revokeToken(token, type) {
-		const tokenDoc = await this.findOne({ token: token, type: type, blacklisted: false });
-		if (!tokenDoc) {
-			throw new APIError('Token not found', httpStatus.BAD_REQUEST);
-		}
-		await tokenDoc.remove();
-	}
-}
-
-tokenSchema.loadClass(TokenClass);
-
-const Token = mongoose.model('tokens', tokenSchema);
-
-export default Token;
-</file>
-
-<file path="backend/src/models/userModel.js">
-import mongoose from 'mongoose';
-import bcrypt from 'bcrypt';
-import paginate from './plugins/paginatePlugin';
-import toJSON from './plugins/toJSONPlugin';
-import APIError from '~/utils/apiError';
-import Role from './roleModel';
-import config from '~/config/config';
-import status from 'http-status';
-
-const userSchema = mongoose.Schema(
-    {
-        userName: {
-            type: String,
-            required: true,
-            unique: true
-        },
-        password: {
-            type: String,
-            required: true,
-            private: true
-        },
-        is_temporary_password: {
-            type: Boolean,
-            default: false
-        },
-        phone_number: {
-            type: String,
-            required: false
-        },
-        avatar: {
-            type: String,
-            default: 'avatar.png'
-        },
-        email: {
-            type: String,
-            required: true,
-            unique: true
-        },
-        roles: [
-            {
-                type: mongoose.SchemaTypes.ObjectId,
-                ref: 'roles'
-            }
-        ],
-        permissions: [
-            {
-                type: mongoose.SchemaTypes.ObjectId,
-                ref: 'permissions'
-            }
-        ],
-        isDeleted: {
-            type: Boolean,
-            default: false
-        },
-    },
-    {
-		timestamps: true,
-		toJSON: { virtuals: true }
-	}
-)
-
-userSchema.plugin(toJSON);
-userSchema.plugin(paginate);
-
-userSchema.virtual('avatarUrl').get(function () {
-    return config.IMAGE_URL + '/' + this.avatar;
-});
-
-class UserClass {
-
-    static async isUserNameAlreadyExists(userName, excludeUserId) {
-        return !!(await this.findOne({ userName, _id: { $ne: excludeUserId } }));
-    }
-
-    static async isEmailAlreadyExists(email, excludeUserId) {
-		return !!(await this.findOne({ email, _id: { $ne: excludeUserId } }));
-	}
-
-    static async isRoleIdAlreadyExists(roleId, excludeUserId) {
-		return !!(await this.findOne({ roles: roleId, _id: { $ne: excludeUserId } }));
-	}
-
-    static async getUser(id) {
-        return await this.findById(id);
-    }
-
-    static async getUserWithRoles(id) {
-        return await this.findOne({ _id: id, isDeleted: false }).populate({
-            path: 'roles',
-            select: 'name description createdAt updatedAt'
-        });
-    }
-
-    static async getUserByUserName(userName) {
-        return await this.findOne({ userName });
-    }
-
-    static async createUser(body) {
-        if (await this.isUserNameAlreadyExists(body.userName)) {
-            throw new APIError('User name already exists', status.BAD_REQUEST);
-        }
-
-        if (await this.isEmailAlreadyExists(body.email)) {
-			throw new APIError('Email already exists', httpStatus.BAD_REQUEST);
-		}
-
-        if (body.roles) {
-            const validRoles = await Role.find({ _id: { $in: body.roles } });
-            if (validRoles.length !== body.roles.length) {
-                throw new APIError('Some roles do not exist', status.BAD_REQUEST);
-            }
-        }
-
-        return await this.create(body);
-    }
-
-    static async updateUser(userId, body) {
-        const user = await this.getUser(userId);
-        if (!user) {
-            throw new APIError('User not found', status.NOT_FOUND);
-        }
-        if (await this.isUserNameAlreadyExists(body.userName, userId)) {
-            throw new APIError('User name already exists', status.BAD_REQUEST);
-        }
-        if (body.roles) {
-            const validRoles = await Role.find({ _id: { $in: body.roles } });
-            if (validRoles.length !== body.roles.length) {
-                throw new APIError('Some roles do not exist', status.BAD_REQUEST);
-            }
-        }
-        Object.assign(user, body);
-        return await user.save();
-    }
-
-    static async deleteUser(userId) {
-        const user = await this.getUser(userId);
-        if (!user) {
-            throw new APIError('User not found', status.NOT_FOUND);
-        }
-        user.isDeleted = true;
-        return await user.save();
-    }
-
-    static async restoreUserById(userId) {
-        const user = await this.getUser(userId);
-        if (!user || !user.isDeleted) {
-            throw new APIError('User not found or not deleted', status.NOT_FOUND);
-        }
-        user.isDeleted = false;
-        return await user.save();
-    }
-
-    async isPasswordMatch(password) {
-        return await bcrypt.compare(password, this.password);
-    }
-}
-
-userSchema.loadClass(UserClass);
-
-userSchema.pre('save', async function (next) {
-    if (this.isModified('password')) {
-        const salt = await bcrypt.genSalt(10);
-        this.password = await bcrypt.hash(this.password, salt);
-    }
-    next();
-});
-
-userSchema.pre(['find', 'findOne', 'findById'], function (next) {
-    if (!this.getFilter().includeDeleted) {
-        this.setQuery({ ...this.getFilter(), isDeleted: false });
-    }
-    next();
-});
-
-const User = mongoose.model('users', userSchema);
-
-export default User;
-</file>
-
 <file path="backend/src/routes/v1/authRoute.js">
 import { Router } from 'express';
 import catchAsync from '~/utils/catchAsync';
@@ -1598,12 +4936,14 @@ import { Router } from 'express';
 import userRoute from './userRoute';
 import authRoute from './authRoute';
 import roleRoute from './roleRoute';
+import walletRoute from './walletRoute';
 
 const router = Router();
 
 router.use('/user', userRoute);
 router.use('/auth', authRoute);
 router.use('/role', roleRoute);
+router.use('/wallet', walletRoute);
 
 export default router;
 </file>
@@ -1678,11 +5018,15 @@ import mongooseConnect from './config/mongoose'; // Fonction de connexion MongoD
 import logger from './config/logger'; // Logger Winston
 import config from './config/config'; // Configuration (PORT, etc.)
 import initialData from './config/initialData'; // Fonction pour initialiser les données
+import { initializeSocketServer } from './socket'; // Initialisation du serveur Socket.io
 
 logger.info("🚀 Server is starting...");
 
 // Créer le serveur HTTP
 const server = http.createServer(app);
+
+// Initialiser Socket.io avec le serveur HTTP
+initializeSocketServer(server);
 
 // Normaliser le port
 const normalizePort = (val) => {
@@ -2322,111 +5666,6 @@ export const resetPassword = (url, appName) => {
 export default { verifyEmail, resetPassword };
 </file>
 
-<file path="backend/src/services/jwtService.js">
-import httpStatus from 'http-status';
-import jwt from 'jsonwebtoken';
-import moment from 'moment';
-import APIError from '~/utils/apiError';
-
-export const sign = async (userId, expires, secret, options) => {
-	try {
-		const payload = {
-			sub: userId,
-			iat: moment().unix(),
-			exp: expires.unix()
-		};
-		return jwt.sign(payload, secret, options);
-	} catch (err) {
-		throw new APIError(err.message, httpStatus.UNAUTHORIZED);
-	}
-};
-
-export const verify = async (token, secret, options) => {
-	try {
-		return jwt.verify(token, secret, options);
-	} catch (err) {
-		throw new APIError(err.message, httpStatus.UNAUTHORIZED);
-	}
-};
-
-export default { sign, verify };
-</file>
-
-<file path="backend/src/services/tokenService.js">
-import moment from 'moment';
-import config from '~/config/config';
-import APIError from '~/utils/apiError';
-import User from '~/models/userModel';
-import Token from '~/models/tokenModel';
-import jwtService from './jwtService';
-import httpStatus from 'http-status';
-import { v4 as uuidv4 } from 'uuid';
-
-export const generateRandomToken = async () => {
-	const randomToken = uuidv4();
-	return randomToken;
-};
-
-export const verifyToken = async (token, type) => {
-	const tokenDoc = await Token.findOne({ token, type, blacklisted: false });
-	if (!tokenDoc) {
-		throw new APIError('Token introuvable', httpStatus.UNAUTHORIZED);
-	}
-	if (moment(tokenDoc.expiresAt).isBefore(moment())) {
-		throw new APIError('Token expiré', httpStatus.UNAUTHORIZED);
-	}
-	return tokenDoc;
-};
-
-export const generateAuthTokens = async (user) => {
-	const accessTokenExpires = moment().add(config.JWT_ACCESS_TOKEN_EXPIRATION_MINUTES, 'minutes');
-	const accessToken = await jwtService.sign(user.id, accessTokenExpires, config.JWT_ACCESS_TOKEN_SECRET_PRIVATE, {
-		algorithm: 'RS256'
-	});
-
-	const refreshTokenExpires = moment().add(config.REFRESH_TOKEN_EXPIRATION_DAYS, 'days');
-	const refreshToken = await generateRandomToken();
-	await Token.saveToken(refreshToken, user.id, refreshTokenExpires.format(), config.TOKEN_TYPES.REFRESH);
-
-	return {
-		accessToken: {
-			token: accessToken,
-			expires: accessTokenExpires.format()
-		},
-		refreshToken: {
-			token: refreshToken,
-			expires: refreshTokenExpires.format()
-		}
-	};
-};
-
-export const generateVerifyEmailToken = async (user) => {
-	const expires = moment().add(config.VERIFY_EMAIL_TOKEN_EXPIRATION_MINUTES, 'minutes');
-	const verifyEmailToken = await generateRandomToken();
-	await Token.saveToken(verifyEmailToken, user.id, expires, config.TOKEN_TYPES.VERIFY_EMAIL);
-	return verifyEmailToken;
-};
-
-export const generateResetPasswordToken = async (email) => {
-	const user = await User.getUserByEmail(email);
-	if (!user) {
-		throw new APIError('Aucun utilisateur trouvé avec cet email', httpStatus.NOT_FOUND);
-	}
-	const expires = moment().add(config.RESET_PASSWORD_TOKEN_EXPIRATION_MINUTES, 'minutes');
-	const resetPasswordToken = await generateRandomToken();
-	await Token.saveToken(resetPasswordToken, user.id, expires, config.TOKEN_TYPES.RESET_PASSWORD);
-	return resetPasswordToken;
-};
-
-export default {
-	generateRandomToken,
-	verifyToken,
-	generateAuthTokens,
-	generateVerifyEmailToken,
-	generateResetPasswordToken
-};
-</file>
-
 <file path="backend/src/utils/apiError.js">
 class APIError extends Error {
 	constructor(message, status = 500, isOperational = true) {
@@ -2684,6 +5923,1361 @@ dist-ssr
 *.sw?
 </file>
 
+<file path="frontend/src/components/Navbar.js">
+import authService from '../services/authService.js';
+import walletService from '../services/walletService.js';
+
+/**
+ * Composant pour la barre de navigation
+ */
+class Navbar {
+  constructor() {
+    this.container = document.createElement('nav');
+    this.container.className = 'navbar';
+    this.wallet = null;
+    this.handleLogout = this.handleLogout.bind(this);
+  }
+
+  /**
+   * Gérer la déconnexion
+   */
+  async handleLogout() {
+    try {
+      await authService.logout();
+      window.location.hash = '/login';
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion:', error);
+    }
+  }
+
+  /**
+   * Charger les informations du portefeuille
+   */
+  async loadWalletData() {
+    if (!authService.isAuthenticated()) {
+      return;
+    }
+
+    try {
+      const response = await walletService.getMyWallet();
+      if (response.success) {
+        this.wallet = response.data;
+        this.updateWalletDisplay();
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement du portefeuille dans la navbar:', error);
+    }
+  }
+
+  /**
+   * Mettre à jour l'affichage du portefeuille
+   */
+  updateWalletDisplay() {
+    const walletElement = document.getElementById('nav-wallet');
+    if (walletElement && this.wallet) {
+      walletElement.innerHTML = `
+        <span class="nav-wallet-balance">${this.wallet.balance}</span>
+        <span class="nav-wallet-currency">GC</span>
+      `;
+      walletElement.classList.remove('loading');
+    }
+  }
+
+  /**
+   * Initialisation après le rendu
+   */
+  afterRender() {
+    const logoutButton = document.getElementById('nav-logout-btn');
+    if (logoutButton) {
+      logoutButton.addEventListener('click', this.handleLogout);
+    }
+  }
+
+  /**
+   * Rendu du composant
+   * @returns {HTMLElement} - Élément HTML du composant
+   */
+  render() {
+    const isAuthenticated = authService.isAuthenticated();
+    
+    this.container.innerHTML = `
+      <div class="container nav-container">
+        <a href="#/" class="nav-brand">GameCenter JS</a>
+        <div class="nav-links">
+          ${isAuthenticated 
+            ? `
+                <a href="#/tic-tac-toe" class="nav-link">Morpion</a>
+                <button id="nav-logout-btn" class="nav-link" style="background: none; border: none; color: white; cursor: pointer;">Déconnexion</button>
+              `
+            : `
+                <a href="#/login" class="nav-link">Connexion</a>
+                <a href="#/register" class="nav-link">Inscription</a>
+              `
+          }
+        </div>
+      </div>
+    `;
+    
+    // Initialiser après le rendu
+    setTimeout(() => {
+      this.afterRender();
+    }, 0);
+    
+    return this.container;
+  }
+}
+
+export default Navbar;
+</file>
+
+<file path="frontend/src/pages/LoginPage.js">
+import authService from '../services/authService.js';
+
+/**
+ * Composant pour la page de connexion
+ */
+class LoginPage {
+  constructor() {
+    this.container = document.createElement('div');
+    this.container.className = 'auth-container';
+    this.handleSubmit = this.handleSubmit.bind(this);
+  }
+
+  /**
+   * Gérer la soumission du formulaire
+   * @param {Event} e - Événement de soumission
+   */
+  async handleSubmit(e) {
+    e.preventDefault();
+
+    const userName = document.getElementById('userName').value;
+    const password = document.getElementById('password').value;
+    const errorElement = document.getElementById('error-message');
+    const submitButton = document.getElementById('submit-btn');
+    const spinner = document.getElementById('spinner');
+
+    // Validation basique
+    if (!userName || !password) {
+      errorElement.textContent = 'Veuillez remplir tous les champs';
+      return;
+    }
+
+    // Afficher le spinner et désactiver le bouton
+    submitButton.disabled = true;
+    spinner.style.display = 'inline-block';
+    errorElement.textContent = '';
+
+    try {
+      await authService.login({ userName, password });
+      // Redirection vers la page d'accueil
+      window.location.hash = '/welcome';
+    } catch (error) {
+      console.error('Erreur de connexion:', error);
+      errorElement.textContent = error.errors ?
+        error.errors.map(err => err.message).join(', ') :
+        'Erreur de connexion. Veuillez réessayer.';
+    } finally {
+      // Masquer le spinner et réactiver le bouton
+      submitButton.disabled = false;
+      spinner.style.display = 'none';
+    }
+  }
+
+  /**
+   * Rendu du composant
+   * @returns {HTMLElement} - Élément HTML du composant
+   */
+  render() {
+    this.container.innerHTML = `
+      <h2 class="auth-title">Connexion</h2>
+      <form id="login-form">
+        <div class="form-group">
+          <label for="userName">Nom d'utilisateur</label>
+          <input type="text" id="userName" name="userName" required>
+        </div>
+        <div class="form-group">
+          <label for="password">Mot de passe</label>
+          <input type="password" id="password" name="password" required>
+        </div>
+        <div id="error-message" class="error-message"></div>
+        <button id="submit-btn" type="submit" class="form-submit">
+          Se connecter
+          <span id="spinner" class="spinner" style="display: none;"></span>
+        </button>
+      </form>
+      <a href="#/register" class="auth-link">Pas encore inscrit ? Créer un compte</a>
+    `;
+
+    // Ajouter les écouteurs d'événements
+    const form = this.container.querySelector('#login-form');
+    if (form) {
+      form.addEventListener('submit', this.handleSubmit);
+    }
+
+    return this.container;
+  }
+}
+
+export default LoginPage;
+</file>
+
+<file path="frontend/src/pages/NotFoundPage.js">
+/**
+ * Composant pour la page 404 (non trouvée)
+ */
+class NotFoundPage {
+  constructor() {
+    this.container = document.createElement('div');
+    this.container.className = 'welcome-container';
+  }
+
+  /**
+   * Rendu du composant
+   * @returns {HTMLElement} - Élément HTML du composant
+   */
+  render() {
+    this.container.innerHTML = `
+      <h1 class="welcome-title">404 - Page non trouvée</h1>
+      <p class="welcome-subtitle">La page que vous recherchez n'existe pas.</p>
+      <div class="card">
+        <p>Désolé, nous n'avons pas pu trouver la page que vous recherchiez.</p>
+        <a href="#/" class="auth-link">Retour à l'accueil</a>
+      </div>
+    `;
+
+    return this.container;
+  }
+}
+
+export default NotFoundPage;
+</file>
+
+<file path="frontend/src/pages/RegisterPage.js">
+import authService from '../services/authService.js';
+
+/**
+ * Composant pour la page d'inscription
+ */
+class RegisterPage {
+  constructor() {
+    this.container = document.createElement('div');
+    this.container.className = 'auth-container';
+    this.handleSubmit = this.handleSubmit.bind(this);
+  }
+
+  /**
+   * Gérer la soumission du formulaire
+   * @param {Event} e - Événement de soumission
+   */
+  async handleSubmit(e) {
+    e.preventDefault();
+
+    const userName = document.getElementById('userName').value;
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    const errorElement = document.getElementById('error-message');
+    const submitButton = document.getElementById('submit-btn');
+    const spinner = document.getElementById('spinner');
+
+    // Validation basique
+    if (!userName || !email || !password) {
+      errorElement.textContent = 'Veuillez remplir tous les champs';
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      errorElement.textContent = 'Les mots de passe ne correspondent pas';
+      return;
+    }
+
+    // Validation du format email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      errorElement.textContent = 'Veuillez entrer une adresse email valide';
+      return;
+    }
+
+    // Validation du mot de passe
+    if (password.length < 6) {
+      errorElement.textContent = 'Le mot de passe doit contenir au moins 6 caractères';
+      return;
+    }
+
+    // Afficher le spinner et désactiver le bouton
+    submitButton.disabled = true;
+    spinner.style.display = 'inline-block';
+    errorElement.textContent = '';
+
+    try {
+      await authService.register({ userName, email, password });
+      // Redirection vers la page d'accueil
+      window.location.hash = '/welcome';
+    } catch (error) {
+      console.error('Erreur d\'inscription:', error);
+      errorElement.textContent = error.errors ?
+        error.errors.map(err => err.message).join(', ') :
+        'Erreur d\'inscription. Veuillez réessayer.';
+    } finally {
+      // Masquer le spinner et réactiver le bouton
+      submitButton.disabled = false;
+      spinner.style.display = 'none';
+    }
+  }
+
+  /**
+   * Rendu du composant
+   * @returns {HTMLElement} - Élément HTML du composant
+   */
+  render() {
+    this.container.innerHTML = `
+      <h2 class="auth-title">Inscription</h2>
+      <form id="register-form">
+        <div class="form-group">
+          <label for="userName">Nom d'utilisateur</label>
+          <input type="text" id="userName" name="userName" required>
+        </div>
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required>
+        </div>
+        <div class="form-group">
+          <label for="password">Mot de passe</label>
+          <input type="password" id="password" name="password" required>
+        </div>
+        <div class="form-group">
+          <label for="confirmPassword">Confirmer le mot de passe</label>
+          <input type="password" id="confirmPassword" name="confirmPassword" required>
+        </div>
+        <div id="error-message" class="error-message"></div>
+        <button id="submit-btn" type="submit" class="form-submit">
+          S'inscrire
+          <span id="spinner" class="spinner" style="display: none;"></span>
+        </button>
+      </form>
+      <a href="#/login" class="auth-link">Déjà inscrit ? Se connecter</a>
+    `;
+
+    // Ajouter les écouteurs d'événements
+    const form = this.container.querySelector('#register-form');
+    if (form) {
+      form.addEventListener('submit', this.handleSubmit);
+    }
+
+    return this.container;
+  }
+}
+
+export default RegisterPage;
+</file>
+
+<file path="frontend/src/services/api.js">
+/**
+ * Service de configuration de l'API
+ */
+const BASE_URL = 'http://localhost:3002/api';
+
+// Configuration initiale
+function getHeaders() {
+  const token = localStorage.getItem('accessToken');
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+}
+
+// Variable pour éviter les boucles infinies de refresh
+let isRefreshing = false;
+
+// Méthodes d'API de base
+async function get(endpoint) {
+  try {
+    const response = await fetch(`${BASE_URL}${endpoint}`, {
+      method: 'GET',
+      headers: getHeaders()
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      // Si le token est expiré et qu'on n'est pas déjà en train de rafraîchir
+      if (response.status === 401 && !isRefreshing) {
+        const refreshResult = await refreshToken();
+        if (refreshResult) {
+          // Réessayer la requête originale
+          return await get(endpoint);
+        }
+      }
+      throw data;
+    }
+
+    return data;
+  } catch (error) {
+    console.error(`Erreur lors de la requête GET ${endpoint}:`, error);
+    throw error;
+  }
+}
+
+async function post(endpoint, data) {
+  try {
+    const response = await fetch(`${BASE_URL}${endpoint}`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+
+    const responseData = await response.json();
+    
+    if (!response.ok) {
+      // Si le token est expiré et qu'on n'est pas déjà en train de rafraîchir
+      if (response.status === 401 && !isRefreshing) {
+        const refreshResult = await refreshToken();
+        if (refreshResult) {
+          // Réessayer la requête originale
+          return await post(endpoint, data);
+        }
+      }
+      throw responseData;
+    }
+
+    return responseData;
+  } catch (error) {
+    console.error(`Erreur lors de la requête POST ${endpoint}:`, error);
+    throw error;
+  }
+}
+
+async function put(endpoint, data) {
+  try {
+    const response = await fetch(`${BASE_URL}${endpoint}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+
+    const responseData = await response.json();
+    
+    if (!response.ok) {
+      // Si le token est expiré et qu'on n'est pas déjà en train de rafraîchir
+      if (response.status === 401 && !isRefreshing) {
+        const refreshResult = await refreshToken();
+        if (refreshResult) {
+          // Réessayer la requête originale
+          return await put(endpoint, data);
+        }
+      }
+      throw responseData;
+    }
+
+    return responseData;
+  } catch (error) {
+    console.error(`Erreur lors de la requête PUT ${endpoint}:`, error);
+    throw error;
+  }
+}
+
+// Fonction de gestion du refresh token
+async function refreshToken() {
+  const refreshToken = localStorage.getItem('refreshToken');
+  
+  if (!refreshToken) {
+    // Redirection vers la page de login si pas de refresh token
+    window.location.hash = '/login';
+    return false;
+  }
+  
+  try {
+    isRefreshing = true;
+    
+    const response = await fetch(`${BASE_URL}/auth/refresh-tokens`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ refreshToken })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Échec du rafraîchissement du token');
+    }
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      localStorage.setItem('accessToken', data.data.tokens.accessToken.token);
+      localStorage.setItem('refreshToken', data.data.tokens.refreshToken.token);
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Erreur lors du rafraîchissement du token:', error);
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    window.location.hash = '/login';
+    return false;
+  } finally {
+    isRefreshing = false;
+  }
+}
+
+export default {
+  get,
+  post,
+  put
+};
+</file>
+
+<file path="frontend/src/services/authService.js">
+import api from './api.js';
+
+/**
+ * Service d'authentification
+ */
+const authService = {
+  /**
+   * Inscription d'un nouvel utilisateur
+   * @param {Object} userData - Données de l'utilisateur (userName, email, password)
+   * @returns {Promise} - Promesse contenant les données de l'utilisateur et les tokens
+   */
+  async register(userData) {
+    try {
+      const response = await api.post('/auth/signup', userData);
+      
+      if (response.success) {
+        // Stocker les tokens
+        localStorage.setItem('accessToken', response.data.tokens.accessToken.token);
+        localStorage.setItem('refreshToken', response.data.tokens.refreshToken.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('Register error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Connexion utilisateur
+   * @param {Object} credentials - Identifiants (userName, password)
+   * @returns {Promise} - Promesse contenant les données de l'utilisateur et les tokens
+   */
+  async login(credentials) {
+    try {
+      const response = await api.post('/auth/signin', credentials);
+      
+      if (response.success) {
+        // Stocker les tokens
+        localStorage.setItem('accessToken', response.data.tokens.accessToken.token);
+        localStorage.setItem('refreshToken', response.data.tokens.refreshToken.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Déconnexion utilisateur
+   * @returns {Promise} - Promesse de déconnexion
+   */
+  async logout() {
+    try {
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (refreshToken) {
+        await api.post('/auth/signout', { refreshToken });
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Supprimer les données locales même si l'API échoue
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+    }
+  },
+
+  /**
+   * Récupérer les informations de l'utilisateur courant
+   * @returns {Promise} - Promesse contenant les données de l'utilisateur
+   */
+  async getCurrentUser() {
+    return api.get('/auth/me');
+  },
+
+  /**
+   * Vérifier si l'utilisateur est connecté
+   * @returns {Boolean} - true si l'utilisateur est connecté
+   */
+  isAuthenticated() {
+    return !!localStorage.getItem('accessToken');
+  },
+
+  /**
+   * Récupérer l'utilisateur stocké localement
+   * @returns {Object|null} - Données utilisateur ou null
+   */
+  getStoredUser() {
+    const userStr = localStorage.getItem('user');
+    return userStr ? JSON.parse(userStr) : null;
+  }
+};
+
+export default authService;
+</file>
+
+<file path="frontend/src/utils/authGuard.js">
+import authService from '../services/authService.js';
+
+/**
+ * Utilitaire pour protéger les routes qui nécessitent une authentification
+ */
+const authGuard = {
+  /**
+   * Vérifier si l'utilisateur est authentifié, sinon rediriger vers la page de connexion
+   * @returns {boolean} - true si authentifié
+   */
+  checkAuth() {
+    const isAuthenticated = authService.isAuthenticated();
+    
+    if (!isAuthenticated) {
+      window.location.hash = '/login';
+      return false;
+    }
+    
+    return true;
+  },
+
+  /**
+   * Vérifier si l'utilisateur est déjà authentifié, si oui rediriger vers la page d'accueil
+   * @returns {boolean} - true si non authentifié
+   */
+  checkNotAuth() {
+    const isAuthenticated = authService.isAuthenticated();
+    
+    if (isAuthenticated) {
+      window.location.hash = '/welcome';
+      return false;
+    }
+    
+    return true;
+  }
+};
+
+export default authGuard;
+</file>
+
+<file path="frontend/src/utils/router.js">
+/**
+ * Gestionnaire de routage simple pour une SPA
+ */
+class Router {
+  constructor(routes, notFoundCallback) {
+    this.routes = routes;
+    this.notFoundCallback = notFoundCallback;
+    this.init();
+  }
+
+  /**
+   * Initialisation du routeur
+   */
+  init() {
+    // Gérer les événements de changement de hash
+    window.addEventListener('hashchange', () => this.handleRouting());
+    
+    // Gérer le routage initial
+    this.handleRouting();
+  }
+
+  /**
+   * Traitement du routage
+   */
+  handleRouting() {
+    const url = window.location.hash.slice(1) || '/';
+    const route = this.findRoute(url);
+    
+    if (route) {
+      route.callback();
+    } else if (this.notFoundCallback) {
+      this.notFoundCallback();
+    }
+  }
+
+  /**
+   * Trouver une route correspondant à l'URL
+   * @param {string} url - URL à rechercher
+   * @returns {Object|null} - Route trouvée ou null
+   */
+  findRoute(url) {
+    return this.routes.find(route => {
+      if (route.path === url) {
+        return true;
+      }
+      
+      // Gestion des routes avec paramètres
+      if (route.path.includes(':')) {
+        const routeParts = route.path.split('/');
+        const urlParts = url.split('/');
+        
+        if (routeParts.length !== urlParts.length) {
+          return false;
+        }
+        
+        const params = {};
+        const isMatch = routeParts.every((part, i) => {
+          if (part.startsWith(':')) {
+            const paramName = part.slice(1);
+            params[paramName] = urlParts[i];
+            return true;
+          }
+          return part === urlParts[i];
+        });
+        
+        if (isMatch) {
+          route.params = params;
+          return true;
+        }
+      }
+      
+      return false;
+    });
+  }
+
+  /**
+   * Naviguer vers une route
+   * @param {string} path - Chemin de la route
+   */
+  navigateTo(path) {
+    window.location.hash = path;
+  }
+}
+
+export default Router;
+</file>
+
+<file path="backend/src/controllers/authController.js">
+import APIError from '~/utils/apiError';
+import tokenService from '~/services/tokenService';
+import emailService from '~/services/emailService';
+import User from '~/models/userModel';
+import config from '~/config/config';
+import status from 'http-status';
+import Token from '~/models/tokenModel';
+import Role from '~/models/roleModel';
+
+export const signup = async (req, res) => {
+	const role = await Role.getRoleByName('User');
+	req.body.roles = [role.id];
+	const user = await User.createUser(req.body);
+	const tokens = await tokenService.generateAuthTokens(user);
+	return res.json({
+		success: true,
+		data: { user, tokens }
+	});
+};
+
+export const signin = async (req, res) => {
+	const user = await User.getUserByUserName(req.body.userName);
+	if (!user || !(await user.isPasswordMatch(req.body.password))) {
+		throw new APIError('Incorrect user name or password', status.BAD_REQUEST);
+	}
+	const tokens = await tokenService.generateAuthTokens(user);
+	return res.json({
+		success: true,
+		data: { user, tokens }
+	});
+};
+
+export const current = async (req, res) => {
+	const user = await User.getUser(req.user.id);
+	if (!user) {
+		throw new APIError('User not found', status.NOT_FOUND);
+	}
+	return res.json({
+		success: true,
+		data: {
+			firstName: user.firstName,
+			lastName: user.lastName,
+			userName: user.userName,
+			avatarUrl: user.avatarUrl
+		}
+	});
+};
+
+export const getMe = async (req, res) => {
+	const user = await User.getUserWithRoles(req.user.id);
+	if (!user) {
+		throw new APIError('User not found', status.NOT_FOUND);
+	}
+	return res.json({
+		success: true,
+		data: user
+	});
+};
+
+export const updateMe = async (req, res) => {
+	const user = await User.updateUser(req.user.id, req.body);
+	return res.json({
+		success: true,
+		data: user
+	});
+};
+
+export const signout = async (req, res) => {
+	await Token.revokeToken(req.body.refreshToken, config.TOKEN_TYPES.REFRESH);
+	return res.json({
+		success: true,
+		data: 'Signout success'
+	});
+};
+
+export const refreshTokens = async (req, res) => {
+	try {
+		const refreshTokenDoc = await tokenService.verifyToken(req.body.refreshToken, config.TOKEN_TYPES.REFRESH);
+		const user = await User.getUser(refreshTokenDoc.user);
+		if (!user) {
+			throw new Error();
+		}
+		await refreshTokenDoc.remove();
+		const tokens = await tokenService.generateAuthTokens(user);
+		return res.json({
+			success: true,
+			data: {
+				tokens
+			}
+		});
+	} catch (err) {
+		throw new APIError(err.message, status.UNAUTHORIZED);
+	}
+};
+
+export const sendVerificationEmail = async (req, res) => {
+	const user = await User.getUserByEmail(req.user.email);
+	if (user.confirmed) {
+		throw new APIError('Email verified', status.BAD_REQUEST);
+	}
+	const verifyEmailToken = await tokenService.generateVerifyEmailToken(req.user);
+	await emailService.sendVerificationEmail(req.user.email, verifyEmailToken);
+	return res.json({
+		success: true,
+		data: 'Send verification email success'
+	});
+};
+
+export const verifyEmail = async (req, res) => {
+	try {
+		const verifyEmailTokenDoc = await tokenService.verifyToken(req.query.token, config.TOKEN_TYPES.VERIFY_EMAIL);
+		const user = await User.getUser(verifyEmailTokenDoc.user);
+		if (!user) {
+			throw new Error();
+		}
+		await Token.deleteMany({ user: user.id, type: config.TOKEN_TYPES.VERIFY_EMAIL });
+		await User.updateUser(user.id, { confirmed: true });
+		return res.json({
+			success: true,
+			data: 'Verify email success'
+		});
+	} catch (err) {
+		throw new APIError('Email verification failed', status.UNAUTHORIZED);
+	}
+};
+
+export const forgotPassword = async (req, res) => {
+	const resetPasswordToken = await tokenService.generateResetPasswordToken(req.body.email);
+	await emailService.sendResetPasswordEmail(req.body.email, resetPasswordToken);
+	return res.json({
+		success: true,
+		data: 'Send forgot password email success'
+	});
+};
+
+export const resetPassword = async (req, res) => {
+	try {
+		const resetPasswordTokenDoc = await tokenService.verifyToken(req.query.token, config.TOKEN_TYPES.RESET_PASSWORD);
+		const user = await User.getUser(resetPasswordTokenDoc.user);
+		if (!user) {
+			throw new Error();
+		}
+		await Token.deleteMany({ user: user.id, type: config.TOKEN_TYPES.RESET_PASSWORD });
+		await User.updateUser(user.id, { password: req.body.password });
+		return res.json({
+			success: true,
+			data: 'Reset password success'
+		});
+	} catch (err) {
+		throw new APIError('Password reset failed', status.UNAUTHORIZED);
+	}
+};
+
+export default {
+	signup,
+	signin,
+	current,
+	getMe,
+	updateMe,
+	signout,
+	refreshTokens,
+	sendVerificationEmail,
+	verifyEmail,
+	forgotPassword,
+	resetPassword
+};
+</file>
+
+<file path="backend/src/controllers/roleController.js">
+import _ from 'lodash';
+import APIError from '~/utils/apiError';
+import User from '~/models/userModel';
+import Role from '~/models/roleModel';
+import status from 'http-status';
+
+export const createRole = async (req, res) => {
+	const role = await Role.createRole(req.body);
+	return res.status(200).json({
+		success: true,
+		data: role
+	});
+};
+
+export const getRole = async (req, res) => {
+	const role = await Role.getRoleById(req.params.roleId);
+	if (!role) {
+		throw new APIError('Role not found', status.NOT_FOUND);
+	}
+	return res.json({
+		success: true,
+		data: role
+	});
+};
+
+export const updateRole = async (req, res) => {
+	const role = await Role.updateRoleById(req.params.roleId, req.body);
+	return res.json({
+		success: true,
+		data: role
+	});
+};
+
+export const getRoles = async (req, res) => {
+	const filters = _.pick(req.query, ['q']);
+	const options = _.pick(req.query, ['limit', 'page', 'sortBy', 'sortDirection']);
+	const roles = await Role.paginate(
+		options,
+		'permissions',
+		filters.q && {
+			$or: [
+				{
+					name: {
+						$regex: filters.q,
+						$options: 'i'
+					}
+				},
+				{
+					description: {
+						$regex: filters.q,
+						$options: 'i'
+					}
+				}
+			]
+		}
+	);
+	return res.json({
+		success: true,
+		data: roles.results,
+		pagination: {
+			total: roles.totalResults
+		}
+	});
+};
+
+export const deleteRole = async (req, res) => {
+	if (await User.isRoleIdAlreadyExists(req.params.roleId)) {
+		throw new APIError('A role cannot be deleted if associated with users', status.BAD_REQUEST);
+	}
+	await Role.deleteRoleById(req.params.roleId);
+	return res.json({
+		success: true,
+		data: {}
+	});
+};
+
+export default { createRole, getRole, updateRole, getRoles, deleteRole };
+</file>
+
+<file path="backend/src/models/tokenModel.js">
+import status from 'http-status';
+import mongoose from 'mongoose';
+import config from '~/config/config';
+import APIError from '~/utils/apiError';
+import toJSON from './plugins/toJSONPlugin';
+
+const tokenSchema = mongoose.Schema(
+	{
+		user: {
+			type: mongoose.SchemaTypes.ObjectId,
+			ref: 'users',
+			required: true
+		},
+		token: {
+			type: String,
+			required: true,
+			index: true
+		},
+		type: {
+			type: String,
+			enum: [config.TOKEN_TYPES.REFRESH, config.TOKEN_TYPES.RESET_PASSWORD, config.TOKEN_TYPES.VERIFY_EMAIL],
+			required: true
+		},
+		blacklisted: {
+			type: Boolean,
+			default: false
+		},
+		expiresAt: {
+			type: Date,
+			required: true
+		}
+	},
+	{
+		timestamps: true
+	}
+);
+
+tokenSchema.plugin(toJSON);
+
+class TokenClass {
+	static async saveToken(token, userId, expires, type, blacklisted = false) {
+		const tokenDoc = await this.create({
+			user: userId,
+			token,
+			type,
+			expiresAt: expires,
+			blacklisted
+		});
+		return tokenDoc;
+	}
+
+	static async revokeToken(token, type) {
+		const tokenDoc = await this.findOne({ token: token, type: type, blacklisted: false });
+		if (!tokenDoc) {
+			throw new APIError('Token not found', status.BAD_REQUEST);
+		}
+		await tokenDoc.deleteOne();
+	}
+}
+
+tokenSchema.loadClass(TokenClass);
+
+const Token = mongoose.model('tokens', tokenSchema);
+
+export default Token;
+</file>
+
+<file path="backend/src/models/userModel.js">
+import mongoose from 'mongoose';
+import bcrypt from 'bcrypt';
+import paginate from './plugins/paginatePlugin';
+import toJSON from './plugins/toJSONPlugin';
+import APIError from '~/utils/apiError';
+import Role from './roleModel';
+import config from '~/config/config';
+import status from 'http-status';
+
+const userSchema = mongoose.Schema(
+    {
+        userName: {
+            type: String,
+            required: true,
+            unique: true
+        },
+        password: {
+            type: String,
+            required: true,
+            private: true
+        },
+        is_temporary_password: {
+            type: Boolean,
+            default: false
+        },
+        phone_number: {
+            type: String,
+            required: false
+        },
+        avatar: {
+            type: String,
+            default: 'avatar.png'
+        },
+        email: {
+            type: String,
+            required: true,
+            unique: true
+        },
+        roles: [
+            {
+                type: mongoose.SchemaTypes.ObjectId,
+                ref: 'roles'
+            }
+        ],
+        permissions: [
+            {
+                type: mongoose.SchemaTypes.ObjectId,
+                ref: 'permissions'
+            }
+        ],
+        isDeleted: {
+            type: Boolean,
+            default: false
+        },
+    },
+    {
+		timestamps: true,
+		toJSON: { virtuals: true }
+	}
+)
+
+userSchema.plugin(toJSON);
+userSchema.plugin(paginate);
+
+userSchema.virtual('avatarUrl').get(function () {
+    return config.IMAGE_URL + '/' + this.avatar;
+});
+
+class UserClass {
+
+    static async isUserNameAlreadyExists(userName, excludeUserId) {
+        return !!(await this.findOne({ userName, _id: { $ne: excludeUserId } }));
+    }
+
+    static async isEmailAlreadyExists(email, excludeUserId) {
+		return !!(await this.findOne({ email, _id: { $ne: excludeUserId } }));
+	}
+
+    static async isRoleIdAlreadyExists(roleId, excludeUserId) {
+		return !!(await this.findOne({ roles: roleId, _id: { $ne: excludeUserId } }));
+	}
+
+    static async getUser(id) {
+        return await this.findById(id);
+    }
+
+    static async getUserWithRoles(id) {
+        return await this.findOne({ _id: id, isDeleted: false }).populate({
+            path: 'roles',
+            select: 'name description createdAt updatedAt'
+        });
+    }
+
+    static async getUserByUserName(userName) {
+        return await this.findOne({ userName });
+    }
+
+    static async createUser(body) {
+        if (await this.isUserNameAlreadyExists(body.userName)) {
+            throw new APIError('User name already exists', status.BAD_REQUEST);
+        }
+
+        if (await this.isEmailAlreadyExists(body.email)) {
+			throw new APIError('Email already exists', status.BAD_REQUEST);
+		}
+
+        if (body.roles) {
+            const validRoles = await Role.find({ _id: { $in: body.roles } });
+            if (validRoles.length !== body.roles.length) {
+                throw new APIError('Some roles do not exist', status.BAD_REQUEST);
+            }
+        }
+
+        return await this.create(body);
+    }
+
+    static async updateUser(userId, body) {
+        const user = await this.getUser(userId);
+        if (!user) {
+            throw new APIError('User not found', status.NOT_FOUND);
+        }
+        if (await this.isUserNameAlreadyExists(body.userName, userId)) {
+            throw new APIError('User name already exists', status.BAD_REQUEST);
+        }
+        if (body.roles) {
+            const validRoles = await Role.find({ _id: { $in: body.roles } });
+            if (validRoles.length !== body.roles.length) {
+                throw new APIError('Some roles do not exist', status.BAD_REQUEST);
+            }
+        }
+        Object.assign(user, body);
+        return await user.save();
+    }
+
+    static async deleteUser(userId) {
+        const user = await this.getUser(userId);
+        if (!user) {
+            throw new APIError('User not found', status.NOT_FOUND);
+        }
+        user.isDeleted = true;
+        return await user.save();
+    }
+
+    static async restoreUserById(userId) {
+        const user = await this.getUser(userId);
+        if (!user || !user.isDeleted) {
+            throw new APIError('User not found or not deleted', status.NOT_FOUND);
+        }
+        user.isDeleted = false;
+        return await user.save();
+    }
+
+    async isPasswordMatch(password) {
+        return await bcrypt.compare(password, this.password);
+    }
+}
+
+userSchema.loadClass(UserClass);
+
+userSchema.pre('save', async function (next) {
+    if (this.isModified('password')) {
+        const salt = await bcrypt.genSalt(10);
+        this.password = await bcrypt.hash(this.password, salt);
+    }
+    next();
+});
+
+userSchema.pre(['find', 'findOne', 'findById'], function (next) {
+    if (!this.getFilter().includeDeleted) {
+        this.setQuery({ ...this.getFilter(), isDeleted: false });
+    }
+    next();
+});
+
+const User = mongoose.model('users', userSchema);
+
+export default User;
+</file>
+
+<file path="backend/src/services/jwtService.js">
+import status from 'http-status';
+import jwt from 'jsonwebtoken';
+import moment from 'moment';
+import APIError from '~/utils/apiError';
+
+export const sign = async (userId, expires, secret, options) => {
+	try {
+		const payload = {
+			sub: userId,
+			iat: moment().unix(),
+			exp: expires.unix()
+		};
+		return jwt.sign(payload, secret, options);
+	} catch (err) {
+		throw new APIError(err.message, status.UNAUTHORIZED);
+	}
+};
+
+export const verify = async (token, secret, options) => {
+	try {
+		return jwt.verify(token, secret, options);
+	} catch (err) {
+		throw new APIError(err.message, status.UNAUTHORIZED);
+	}
+};
+
+export default { sign, verify };
+</file>
+
+<file path="backend/src/services/tokenService.js">
+import moment from 'moment';
+import config from '~/config/config';
+import APIError from '~/utils/apiError';
+import User from '~/models/userModel';
+import Token from '~/models/tokenModel';
+import jwtService from './jwtService';
+import status from 'http-status';
+import { v4 as uuidv4 } from 'uuid';
+
+export const generateRandomToken = async () => {
+	const randomToken = uuidv4();
+	return randomToken;
+};
+
+export const verifyToken = async (token, type) => {
+	const tokenDoc = await Token.findOne({ token, type, blacklisted: false });
+	if (!tokenDoc) {
+		throw new APIError('Token introuvable', status.UNAUTHORIZED);
+	}
+	if (moment(tokenDoc.expiresAt).isBefore(moment())) {
+		throw new APIError('Token expiré', status.UNAUTHORIZED);
+	}
+	return tokenDoc;
+};
+
+export const generateAuthTokens = async (user) => {
+	const accessTokenExpires = moment().add(config.JWT_ACCESS_TOKEN_EXPIRATION_MINUTES, 'minutes');
+	const accessToken = await jwtService.sign(user.id, accessTokenExpires, config.JWT_ACCESS_TOKEN_SECRET_PRIVATE, {
+		algorithm: 'RS256'
+	});
+
+	const refreshTokenExpires = moment().add(config.REFRESH_TOKEN_EXPIRATION_DAYS, 'days');
+	const refreshToken = await generateRandomToken();
+	await Token.saveToken(refreshToken, user.id, refreshTokenExpires.format(), config.TOKEN_TYPES.REFRESH);
+
+	return {
+		accessToken: {
+			token: accessToken,
+			expires: accessTokenExpires.format()
+		},
+		refreshToken: {
+			token: refreshToken,
+			expires: refreshTokenExpires.format()
+		}
+	};
+};
+
+export const generateVerifyEmailToken = async (user) => {
+	const expires = moment().add(config.VERIFY_EMAIL_TOKEN_EXPIRATION_MINUTES, 'minutes');
+	const verifyEmailToken = await generateRandomToken();
+	await Token.saveToken(verifyEmailToken, user.id, expires, config.TOKEN_TYPES.VERIFY_EMAIL);
+	return verifyEmailToken;
+};
+
+export const generateResetPasswordToken = async (email) => {
+	const user = await User.getUserByEmail(email);
+	if (!user) {
+		throw new APIError('Aucun utilisateur trouvé avec cet email', status.NOT_FOUND);
+	}
+	const expires = moment().add(config.RESET_PASSWORD_TOKEN_EXPIRATION_MINUTES, 'minutes');
+	const resetPasswordToken = await generateRandomToken();
+	await Token.saveToken(resetPasswordToken, user.id, expires, config.TOKEN_TYPES.RESET_PASSWORD);
+	return resetPasswordToken;
+};
+
+export default {
+	generateRandomToken,
+	verifyToken,
+	generateAuthTokens,
+	generateVerifyEmailToken,
+	generateResetPasswordToken
+};
+</file>
+
+<file path="frontend/index.html">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GameCenter JS</title>
+  <link rel="stylesheet" href="./src/style.css">
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
+</file>
+
 <file path="frontend/package.json">
 {
   "name": "frontend",
@@ -2695,6 +7289,10 @@ dist-ssr
     "build": "vite build",
     "preview": "vite preview"
   },
+  "dependencies": {
+    "axios": "^1.6.2",
+    "socket.io-client": "^4.7.4"
+  },
   "devDependencies": {
     "vite": "^6.3.1"
   }
@@ -2702,34 +7300,258 @@ dist-ssr
 </file>
 
 <file path="frontend/src/main.js">
-import './style.css'
-import javascriptLogo from './javascript.svg'
-import viteLogo from '/vite.svg'
-import { setupCounter } from './counter.js'
+import './styles/index.css';
+import LoginPage from './pages/LoginPage.js';
+import RegisterPage from './pages/RegisterPage.js';
+import HomePage from './pages/HomePage.js';
+import NotFoundPage from './pages/NotFoundPage.js';
+import TicTacToePage from './pages/TicTacToePage.js';
+import authService from './services/authService.js';
+import Navbar from './components/Navbar.js';
+import { cleanupAllSocketConnections } from './services/socket';
 
-document.querySelector('#app').innerHTML = `
-  <div>
-    <a href="https://vite.dev" target="_blank">
-      <img src="${viteLogo}" class="logo" alt="Vite logo" />
-    </a>
-    <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript" target="_blank">
-      <img src="${javascriptLogo}" class="logo vanilla" alt="JavaScript logo" />
-    </a>
-    <h1>Hello Vite!</h1>
-    <div class="card">
-      <button id="counter" type="button"></button>
-    </div>
-    <p class="read-the-docs">
-      Click on the Vite logo to learn more
-    </p>
-  </div>
-`
+/**
+ * Application principale simplifiée
+ */
+class App {
+  constructor() {
+    this.appElement = document.getElementById('app');
+    this.currentPage = null;
+    this.init();
+  }
 
-setupCounter(document.querySelector('#counter'))
+  /**
+   * Initialisation de l'application
+   */
+  init() {
+    // Rendu initial de l'interface
+    this.renderApp();
+    
+    // Configuration des écouteurs d'événements pour le routage
+    window.addEventListener('hashchange', () => this.handleRouting());
+    
+    // Routage initial
+    this.handleRouting();
+  }
+
+  /**
+   * Rendu de la structure de base de l'application
+   */
+  renderApp() {
+    // Vider l'élément app
+    this.appElement.innerHTML = '';
+    
+    // Créer et ajouter la navbar comme composant
+    const navbar = new Navbar();
+    this.appElement.appendChild(navbar.render());
+    
+    // Créer le conteneur de page
+    const pageContainer = document.createElement('div');
+    pageContainer.id = 'page-container';
+    pageContainer.className = 'container';
+    this.appElement.appendChild(pageContainer);
+  }
+
+  /**
+   * Nettoyage de la page courante
+   */
+  cleanupCurrentPage() {
+    if (this.currentPage && typeof this.currentPage.destroy === 'function') {
+      this.currentPage.destroy();
+    }
+  }
+
+  /**
+   * Gestion du routage
+   */
+  handleRouting() {
+    const url = window.location.hash.slice(1) || '/';
+    const isAuthenticated = authService.isAuthenticated();
+    
+    // Nettoyer la page courante
+    this.cleanupCurrentPage();
+    
+    // Routage en fonction de l'URL et de l'état d'authentification
+    let pageComponent = null;
+    
+    switch (url) {
+      case '/':
+      case '/login':
+        pageComponent = isAuthenticated ? new HomePage() : new LoginPage();
+        if (isAuthenticated) {
+          window.location.hash = '/home';
+          return;
+        }
+        break;
+      case '/register':
+        pageComponent = isAuthenticated ? new HomePage() : new RegisterPage();
+        if (isAuthenticated) {
+          window.location.hash = '/home';
+          return;
+        }
+        break;
+      case '/home':
+      case '/welcome': // Pour la compatibilité avec les anciens liens
+        if (!isAuthenticated) {
+          window.location.hash = '/login';
+          return;
+        }
+        pageComponent = new HomePage();
+        break;
+      case '/tic-tac-toe':
+        if (!isAuthenticated) {
+          window.location.hash = '/login';
+          return;
+        }
+        pageComponent = new TicTacToePage();
+        break;
+      default:
+        pageComponent = new NotFoundPage();
+    }
+    
+    // Rendu de la page
+    if (pageComponent) {
+      this.currentPage = pageComponent;
+      this.renderPage(pageComponent);
+    }
+    
+    // Forcer la mise à jour de la navbar lors d'un changement de route
+    const navbar = new Navbar();
+    const oldNavbar = document.querySelector('.navbar');
+    if (oldNavbar) {
+      this.appElement.replaceChild(navbar.render(), oldNavbar);
+    }
+  }
+
+  /**
+   * Rendu d'une page
+   * @param {Object} pageComponent - Instance de la page à rendre
+   */
+  renderPage(pageComponent) {
+    const pageContainer = document.getElementById('page-container');
+    if (pageContainer) {
+      // Vider le conteneur et ajouter la nouvelle page
+      pageContainer.innerHTML = '';
+      const pageElement = pageComponent.render();
+      pageContainer.appendChild(pageElement);
+      
+      // Si la page a une méthode afterRender, l'appeler
+      if (typeof pageComponent.afterRender === 'function') {
+        setTimeout(() => {
+          pageComponent.afterRender();
+        }, 0);
+      }
+    }
+  }
+}
+
+// Au moment de quitter l'application, nettoyer les connexions
+window.addEventListener('beforeunload', () => {
+  cleanupAllSocketConnections();
+});
+
+// Initialiser l'application au chargement de la page
+document.addEventListener('DOMContentLoaded', () => {
+  new App();
+});
 </file>
 
 <file path="readme.md">
-init
+# GameCenter JS
+
+Un jeu multijoueur développé en JavaScript Vanilla avec un backend Express.
+
+## Structure du projet
+
+Le projet est divisé en deux parties principales:
+
+- `backend`: API RESTful avec Express et MongoDB
+- `frontend`: Application web en JavaScript Vanilla
+
+## Prérequis
+
+- Node.js (v14+)
+- MongoDB
+
+## Installation
+
+### Configuration du backend
+
+1. Accédez au répertoire du backend:
+   ```bash
+   cd backend
+   ```
+
+2. Installez les dépendances:
+   ```bash
+   npm install
+   ```
+
+3. Créez un fichier `.env` dans le répertoire du backend avec les variables suivantes:
+   ```
+   NODE_ENV=development
+   APP_NAME=GameCenter
+   PORT=3002
+   
+   DB_HOST_PROD=mongodb://localhost:27017/gamecenter_prod
+   DB_HOST_DEV=mongodb://localhost:27017/gamecenter_dev
+   
+   JWT_ACCESS_TOKEN_SECRET_PRIVATE=LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQ0KTUlJQk9nSUJBQUpCQU5SNHOrU3MzZEtRTkpRZ2JqWEVUL1ZXRkRPaDdzVXg2bWlrZTVNNWZQUHg3bXJLd3FvRQ0KamtFOUNIZTJkQXZoUFpMYTlmZ0xhODlOYTBWRnR5ZGFGUlVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUVDQVFFQ0FRRUNBUUUJ1bWg2N1FJREFRQUINCi0tLS0tRU5EIFJTQSBQUklWQVRFIEtFWS0tLS0t
+   JWT_ACCESS_TOKEN_SECRET_PUBLIC=LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0NCk1Gd3dEUVlKS29aSWh2Y05BUUVCQlFBRFN3QXdTQUpCQU5SNHUrU3MzZEtRTkpRZ2JqWEVUL1ZXRkRPaDdzVXgNCjZtaWtlNU01ZlBQeDdtckt3cW9FamtFOUNIZTJkQXZoUFpMYTlmZ0xhODlOYTBWRnR5ZGFGUlVDQVFFPQ0KLS0tLS1FTkQgUFVCTElDIEtFWS0tLS0t
+   JWT_ACCESS_TOKEN_EXPIRATION_MINUTES=240
+   
+   REFRESH_TOKEN_EXPIRATION_DAYS=1
+   VERIFY_EMAIL_TOKEN_EXPIRATION_MINUTES=60
+   RESET_PASSWORD_TOKEN_EXPIRATION_MINUTES=30
+   
+   SMTP_HOST=smtp.example.com
+   SMTP_PORT=587
+   SMTP_USERNAME=your_email@example.com
+   SMTP_PASSWORD=your_email_password
+   EMAIL_FROM=noreply@example.com
+   
+   FRONTEND_URL=http://localhost:3000
+   IMAGE_URL=http://localhost:3002/images
+   ```
+
+4. Lancez le serveur backend:
+   ```bash
+   npm run dev
+   ```
+
+### Configuration du frontend
+
+1. Accédez au répertoire du frontend:
+   ```bash
+   cd frontend
+   ```
+
+2. Installez les dépendances:
+   ```bash
+   npm install
+   ```
+
+3. Lancez le serveur de développement:
+   ```bash
+   npm run dev
+   ```
+
+4. Ouvrez votre navigateur et accédez à l'URL indiquée (généralement http://localhost:5173)
+
+## Fonctionnalités
+
+- Système d'authentification (inscription, connexion, déconnexion)
+- Gestion des tokens (accessToken et refreshToken)
+- Système de compte utilisateur
+- Interface utilisateur responsive
+
+## Contribuer
+
+1. Forkez le projet
+2. Créez une branche pour votre fonctionnalité (`git checkout -b feature/amazing-feature`)
+3. Commitez vos changements (`git commit -m 'Add some amazing feature'`)
+4. Poussez vers la branche (`git push origin feature/amazing-feature`)
+5. Ouvrez une Pull Request
 </file>
 
 </files>

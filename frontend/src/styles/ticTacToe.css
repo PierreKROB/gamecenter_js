@@ -1,0 +1,234 @@
+/* Styles pour le jeu de morpion */
+.game-container {
+  max-width: 600px;
+  margin: 30px auto;
+  padding: 20px;
+  background-color: var(--card-background);
+  border-radius: 8px;
+  box-shadow: var(--box-shadow);
+}
+
+.game-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.game-status {
+  font-size: 18px;
+  color: var(--primary-color);
+  font-weight: bold;
+}
+
+.game-actions {
+  margin: 25px 0;
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
+
+.ttt-board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 10px;
+  width: 300px;
+  height: 300px;
+  margin: 0 auto 20px;
+}
+
+.ttt-cell {
+  background-color: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  font-weight: bold;
+  border-radius: 5px;
+  cursor: default;
+  transition: all 0.2s ease;
+}
+
+.ttt-cell.clickable {
+  cursor: pointer;
+}
+
+.ttt-cell.clickable:hover {
+  background-color: #e0e0e0;
+}
+
+.cell-x {
+  color: #e74c3c;
+}
+
+.cell-o {
+  color: #3498db;
+}
+
+.game-info {
+  display: flex;
+  justify-content: space-around;
+  margin: 20px 0;
+}
+
+.player-info {
+  background-color: #f0f0f0;
+  padding: 10px 15px;
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 120px;
+}
+
+.current-player {
+  background-color: #e0f7fa;
+  border: 2px solid var(--primary-color);
+}
+
+.player-name {
+  font-weight: bold;
+}
+
+.player-symbol {
+  font-size: 14px;
+  color: #666;
+}
+
+.you-tag {
+  background-color: var(--accent-color);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+/* Styles pour les paris */
+.game-bet {
+  font-size: 14px;
+  color: var(--accent-color);
+  margin-top: 5px;
+  font-weight: bold;
+}
+
+/* Modal pour paris personnalisés */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+.modal-content {
+  background-color: white;
+  margin: 10% auto;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  width: 80%;
+  max-width: 500px;
+  position: relative;
+}
+
+.close-modal {
+  position: absolute;
+  right: 15px;
+  top: 10px;
+  font-size: 24px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.close-modal:hover {
+  color: var(--accent-color);
+}
+
+.bet-info {
+  margin: 15px 0;
+  color: #666;
+  font-style: italic;
+}
+
+#bet-amount-input {
+  width: 100%;
+  margin: 10px 0;
+}
+
+#preview-amount {
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--primary-color);
+  display: block;
+  text-align: center;
+  margin-top: 5px;
+}
+
+.game-loading {
+  text-align: center;
+  padding: 40px;
+}
+
+.game-loading .spinner {
+  margin: 20px auto;
+  display: block;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-top: 3px solid var(--primary-color);
+  width: 40px;
+  height: 40px;
+}
+
+.games-list {
+  margin-top: 20px;
+}
+
+.game-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background-color: #f0f0f0;
+  border-radius: 5px;
+  margin-bottom: 10px;
+}
+
+.no-games {
+  text-align: center;
+  color: #666;
+  padding: 20px 0;
+}
+
+.available-games h2 {
+  margin-top: 30px;
+  text-align: center;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .ttt-board {
+    width: 250px;
+    height: 250px;
+  }
+  
+  .ttt-cell {
+    font-size: 36px;
+  }
+  
+  .game-container {
+    margin: 20px 10px;
+    padding: 15px;
+  }
+  
+  .game-info {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .player-info {
+    width: 100%;
+  }
+}

@@ -1,9 +1,12 @@
-import './style.css';
+import './styles/index.css';
 import LoginPage from './pages/LoginPage.js';
 import RegisterPage from './pages/RegisterPage.js';
-import WelcomePage from './pages/WelcomePage.js';
+import HomePage from './pages/HomePage.js';
 import NotFoundPage from './pages/NotFoundPage.js';
+import TicTacToePage from './pages/TicTacToePage.js';
 import authService from './services/authService.js';
+import Navbar from './components/Navbar.js';
+import { cleanupAllSocketConnections } from './services/socket';
 
 /**
  * Application principale simplifiée
@@ -33,51 +36,26 @@ class App {
    * Rendu de la structure de base de l'application
    */
   renderApp() {
-    this.appElement.innerHTML = `
-      <nav class="navbar">
-        <div class="container nav-container">
-          <a href="#/" class="nav-brand">GameCenter JS</a>
-          <div class="nav-links" id="nav-links">
-            <!-- Les liens de navigation seront injectés ici -->
-          </div>
-        </div>
-      </nav>
-      <div id="page-container" class="container">
-        <!-- Le contenu de la page courante sera injecté ici -->
-      </div>
-    `;
+    // Vider l'élément app
+    this.appElement.innerHTML = '';
     
-    // Mettre à jour les liens de navigation en fonction de l'état d'authentification
-    this.updateNavLinks();
+    // Créer et ajouter la navbar comme composant
+    const navbar = new Navbar();
+    this.appElement.appendChild(navbar.render());
+    
+    // Créer le conteneur de page
+    const pageContainer = document.createElement('div');
+    pageContainer.id = 'page-container';
+    pageContainer.className = 'container';
+    this.appElement.appendChild(pageContainer);
   }
 
   /**
-   * Mise à jour des liens de navigation
+   * Nettoyage de la page courante
    */
-  updateNavLinks() {
-    const navLinksContainer = document.getElementById('nav-links');
-    const isAuthenticated = authService.isAuthenticated();
-    
-    if (navLinksContainer) {
-      navLinksContainer.innerHTML = isAuthenticated 
-        ? `
-            <a href="#/welcome" class="nav-link">Accueil</a>
-            <button id="nav-logout-btn" class="nav-link" style="background: none; border: none; color: white; cursor: pointer;">Déconnexion</button>
-          `
-        : `
-            <a href="#/login" class="nav-link">Connexion</a>
-            <a href="#/register" class="nav-link">Inscription</a>
-          `;
-      
-      // Ajouter l'écouteur d'événement pour le bouton de déconnexion
-      const logoutButton = document.getElementById('nav-logout-btn');
-      if (logoutButton) {
-        logoutButton.addEventListener('click', async () => {
-          await authService.logout();
-          this.updateNavLinks();
-          window.location.hash = '/login';
-        });
-      }
+  cleanupCurrentPage() {
+    if (this.currentPage && typeof this.currentPage.destroy === 'function') {
+      this.currentPage.destroy();
     }
   }
 
@@ -88,31 +66,42 @@ class App {
     const url = window.location.hash.slice(1) || '/';
     const isAuthenticated = authService.isAuthenticated();
     
+    // Nettoyer la page courante
+    this.cleanupCurrentPage();
+    
     // Routage en fonction de l'URL et de l'état d'authentification
     let pageComponent = null;
     
     switch (url) {
       case '/':
       case '/login':
-        pageComponent = isAuthenticated ? new WelcomePage() : new LoginPage();
+        pageComponent = isAuthenticated ? new HomePage() : new LoginPage();
         if (isAuthenticated) {
-          window.location.hash = '/welcome';
+          window.location.hash = '/home';
           return;
         }
         break;
       case '/register':
-        pageComponent = isAuthenticated ? new WelcomePage() : new RegisterPage();
+        pageComponent = isAuthenticated ? new HomePage() : new RegisterPage();
         if (isAuthenticated) {
-          window.location.hash = '/welcome';
+          window.location.hash = '/home';
           return;
         }
         break;
-      case '/welcome':
+      case '/home':
+      case '/welcome': // Pour la compatibilité avec les anciens liens
         if (!isAuthenticated) {
           window.location.hash = '/login';
           return;
         }
-        pageComponent = new WelcomePage();
+        pageComponent = new HomePage();
+        break;
+      case '/tic-tac-toe':
+        if (!isAuthenticated) {
+          window.location.hash = '/login';
+          return;
+        }
+        pageComponent = new TicTacToePage();
         break;
       default:
         pageComponent = new NotFoundPage();
@@ -120,11 +109,16 @@ class App {
     
     // Rendu de la page
     if (pageComponent) {
+      this.currentPage = pageComponent;
       this.renderPage(pageComponent);
     }
     
-    // Mise à jour des liens de navigation
-    this.updateNavLinks();
+    // Forcer la mise à jour de la navbar lors d'un changement de route
+    const navbar = new Navbar();
+    const oldNavbar = document.querySelector('.navbar');
+    if (oldNavbar) {
+      this.appElement.replaceChild(navbar.render(), oldNavbar);
+    }
   }
 
   /**
@@ -148,6 +142,11 @@ class App {
     }
   }
 }
+
+// Au moment de quitter l'application, nettoyer les connexions
+window.addEventListener('beforeunload', () => {
+  cleanupAllSocketConnections();
+});
 
 // Initialiser l'application au chargement de la page
 document.addEventListener('DOMContentLoaded', () => {

@@ -1,0 +1,7 @@
+/* Fichier principal qui importe tous les autres fichiers CSS */
+@import './base.css';
+@import './navbar.css';
+@import './auth.css';
+@import './welcome.css';
+@import './home.css';
+@import './ticTacToe.css';

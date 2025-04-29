@@ -1,3 +1,4 @@
+/* Variables et styles de base */
 :root {
   --primary-color: #4a56e2;
   --secondary-color: #6c7ae0;
@@ -6,6 +7,8 @@
   --text-color: #333;
   --error-color: #e74c3c;
   --success-color: #2ecc71;
+  --warning-color: #f39c12;
+  --info-color: #3498db;
   --card-background: #fff;
   --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
@@ -107,98 +110,24 @@ input, textarea, select {
   margin-bottom: 16px;
 }
 
-/* Auth forms */
-.auth-container {
-  max-width: 400px;
-  margin: 60px auto;
-  padding: 30px;
-  background-color: var(--card-background);
-  border-radius: 8px;
-  box-shadow: var(--box-shadow);
-}
-
-.auth-title {
-  text-align: center;
-  margin-bottom: 24px;
-}
-
-.auth-link {
-  display: block;
-  text-align: center;
-  margin-top: 16px;
-}
-
-.form-submit {
-  width: 100%;
-  padding: 12px;
-  margin-top: 8px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 10px;
-}
-
-/* Welcome page */
-.welcome-container {
-  text-align: center;
-  padding: 60px 20px;
-}
-
-.welcome-title {
-  font-size: 2.5rem;
-  margin-bottom: 16px;
-}
-
-.welcome-subtitle {
-  font-size: 1.2rem;
-  color: #666;
-  margin-bottom: 32px;
-}
-
-.user-info {
-  background-color: var(--card-background);
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: var(--box-shadow);
-  max-width: 500px;
-  margin: 0 auto 30px auto;
-  text-align: left;
-}
-
-/* Navigation */
-.navbar {
+/* Boutons avec différentes couleurs */
+.primary-btn {
   background-color: var(--primary-color);
-  color: white;
-  padding: 15px 0;
 }
 
-.nav-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.secondary-btn {
+  background-color: var(--secondary-color);
 }
 
-.nav-brand {
-  font-size: 24px;
-  font-weight: bold;
-  color: white;
+.danger-btn {
+  background-color: var(--error-color);
 }
 
-.nav-links {
-  display: flex;
-  gap: 20px;
+.primary-btn:hover, .secondary-btn:hover, .danger-btn:hover {
+  opacity: 0.9;
 }
 
-.nav-link {
-  color: white;
-  font-weight: 500;
-}
-
-.nav-link:hover {
-  color: #f0f0f0;
-}
-
-/* Loading spinner */
+/* Spinner de chargement */
 .spinner {
   display: inline-block;
   width: 20px;
@@ -215,29 +144,54 @@ input, textarea, select {
   100% { transform: rotate(360deg); }
 }
 
-/* Page 404 */
-.not-found {
-  text-align: center;
-  padding: 60px 20px;
+/* Notifications */
+.notifications-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 300px;
+  max-width: 100%;
+  z-index: 1000;
+}
+
+.notification {
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 10px;
+  color: white;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  animation: slideIn 0.3s ease-out;
+  transition: opacity 0.5s ease-out;
+}
+
+.notification-info {
+  background-color: var(--info-color);
+}
+
+.notification-success {
+  background-color: var(--success-color);
+}
+
+.notification-error {
+  background-color: var(--error-color);
+}
+
+.notification-warning {
+  background-color: var(--warning-color);
+}
+
+.notification.fade-out {
+  opacity: 0;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
 }
 
 /* Responsive */
 @media (max-width: 768px) {
-  .auth-container {
-    max-width: 100%;
-    margin: 40px 20px;
-  }
-  
-  .welcome-title {
-    font-size: 2rem;
-  }
-  
-  .nav-container {
-    flex-direction: column;
-    gap: 10px;
-  }
-  
-  .nav-links {
-    margin-top: 10px;
+  .container {
+    padding: 0 15px;
   }
 }

@@ -16,7 +16,7 @@ class RegisterPage {
    */
   async handleSubmit(e) {
     e.preventDefault();
-    
+
     const userName = document.getElementById('userName').value;
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
@@ -24,44 +24,44 @@ class RegisterPage {
     const errorElement = document.getElementById('error-message');
     const submitButton = document.getElementById('submit-btn');
     const spinner = document.getElementById('spinner');
-    
+
     // Validation basique
     if (!userName || !email || !password) {
       errorElement.textContent = 'Veuillez remplir tous les champs';
       return;
     }
-    
+
     if (password !== confirmPassword) {
       errorElement.textContent = 'Les mots de passe ne correspondent pas';
       return;
     }
-    
+
     // Validation du format email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       errorElement.textContent = 'Veuillez entrer une adresse email valide';
       return;
     }
-    
+
     // Validation du mot de passe
     if (password.length < 6) {
       errorElement.textContent = 'Le mot de passe doit contenir au moins 6 caractères';
       return;
     }
-    
+
     // Afficher le spinner et désactiver le bouton
     submitButton.disabled = true;
     spinner.style.display = 'inline-block';
     errorElement.textContent = '';
-    
+
     try {
       await authService.register({ userName, email, password });
       // Redirection vers la page d'accueil
       window.location.hash = '/welcome';
     } catch (error) {
       console.error('Erreur d\'inscription:', error);
-      errorElement.textContent = error.errors ? 
-        error.errors.map(err => err.message).join(', ') : 
+      errorElement.textContent = error.errors ?
+        error.errors.map(err => err.message).join(', ') :
         'Erreur d\'inscription. Veuillez réessayer.';
     } finally {
       // Masquer le spinner et réactiver le bouton
@@ -102,13 +102,13 @@ class RegisterPage {
       </form>
       <a href="#/login" class="auth-link">Déjà inscrit ? Se connecter</a>
     `;
-    
+
     // Ajouter les écouteurs d'événements
     const form = this.container.querySelector('#register-form');
     if (form) {
       form.addEventListener('submit', this.handleSubmit);
     }
-    
+
     return this.container;
   }
 }

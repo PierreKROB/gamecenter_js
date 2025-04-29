@@ -16,32 +16,32 @@ class LoginPage {
    */
   async handleSubmit(e) {
     e.preventDefault();
-    
+
     const userName = document.getElementById('userName').value;
     const password = document.getElementById('password').value;
     const errorElement = document.getElementById('error-message');
     const submitButton = document.getElementById('submit-btn');
     const spinner = document.getElementById('spinner');
-    
+
     // Validation basique
     if (!userName || !password) {
       errorElement.textContent = 'Veuillez remplir tous les champs';
       return;
     }
-    
+
     // Afficher le spinner et désactiver le bouton
     submitButton.disabled = true;
     spinner.style.display = 'inline-block';
     errorElement.textContent = '';
-    
+
     try {
       await authService.login({ userName, password });
       // Redirection vers la page d'accueil
       window.location.hash = '/welcome';
     } catch (error) {
       console.error('Erreur de connexion:', error);
-      errorElement.textContent = error.errors ? 
-        error.errors.map(err => err.message).join(', ') : 
+      errorElement.textContent = error.errors ?
+        error.errors.map(err => err.message).join(', ') :
         'Erreur de connexion. Veuillez réessayer.';
     } finally {
       // Masquer le spinner et réactiver le bouton
@@ -74,13 +74,13 @@ class LoginPage {
       </form>
       <a href="#/register" class="auth-link">Pas encore inscrit ? Créer un compte</a>
     `;
-    
+
     // Ajouter les écouteurs d'événements
     const form = this.container.querySelector('#login-form');
     if (form) {
       form.addEventListener('submit', this.handleSubmit);
     }
-    
+
     return this.container;
   }
 }

@@ -54,7 +54,7 @@ class TokenClass {
 		if (!tokenDoc) {
 			throw new APIError('Token not found', status.BAD_REQUEST);
 		}
-		await tokenDoc.remove();
+		await tokenDoc.deleteOne();
 	}
 }
 

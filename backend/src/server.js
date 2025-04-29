@@ -4,11 +4,15 @@ import mongooseConnect from './config/mongoose'; // Fonction de connexion MongoD
 import logger from './config/logger'; // Logger Winston
 import config from './config/config'; // Configuration (PORT, etc.)
 import initialData from './config/initialData'; // Fonction pour initialiser les données
+import { initializeSocketServer } from './socket'; // Initialisation du serveur Socket.io
 
 logger.info("🚀 Server is starting...");
 
 // Créer le serveur HTTP
 const server = http.createServer(app);
+
+// Initialiser Socket.io avec le serveur HTTP
+initializeSocketServer(server);
 
 // Normaliser le port
 const normalizePort = (val) => {
