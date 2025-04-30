@@ -17,7 +17,7 @@ class TicTacToePage {
     this.betAmount = 50; // Montant par défaut pour une partie de morpion
     this.customBetAmount = null; // Montant personnalisé de la mise
     this.hasBet = false; // Indique si le joueur a déjà misé
-    
+
     // Lier les méthodes
     this.setupEventListeners = this.setupEventListeners.bind(this);
     this.handleCellClick = this.handleCellClick.bind(this);
@@ -28,6 +28,7 @@ class TicTacToePage {
     this.handleBackToLobby = this.handleBackToLobby.bind(this);
     this.handlePlaceBet = this.handlePlaceBet.bind(this);
     this.handleBetAmountChange = this.handleBetAmountChange.bind(this);
+    this.handleBetNumberChange = this.handleBetNumberChange.bind(this);
   }
 
   /**
@@ -37,7 +38,7 @@ class TicTacToePage {
     // Se connecter au service de jeu
     try {
       await TicTacToeService.connect();
-      
+
       // Écouteurs pour le lobby
       TicTacToeService.onLobbyUpdate((data) => {
         const lobbyPlayersElement = document.getElementById('lobby-players');
@@ -45,39 +46,39 @@ class TicTacToePage {
           lobbyPlayersElement.textContent = `Joueurs en attente: ${data.players}`;
         }
       });
-      
+
       TicTacToeService.onNewGameAvailable((data) => {
         this.addGameToList(data.gameId, data.creator, data.betAmount);
       });
-      
+
       TicTacToeService.onGameRemoved((data) => {
         const gameElement = document.getElementById(`game-${data.gameId}`);
         if (gameElement) {
           gameElement.remove();
         }
       });
-      
+
       // Nouvelle fonction pour gérer la liste des parties disponibles
       TicTacToeService.onAvailableGames((data) => {
         const gamesList = document.getElementById('games-list');
         if (!gamesList) return;
-        
+
         // Nettoyer la liste existante et garder uniquement le message "Aucune partie disponible"
         const noGamesMessage = gamesList.querySelector('.no-games');
         gamesList.innerHTML = '';
-        
+
         // Si aucune partie disponible, afficher le message
         if (data.games.length === 0) {
           gamesList.innerHTML = '<p class="no-games">Aucune partie disponible. Créez-en une!</p>';
           return;
         }
-        
+
         // Ajouter chaque partie disponible à la liste
         data.games.forEach(game => {
           this.addGameToList(game.gameId, game.creator, game.betAmount);
         });
       });
-      
+
       // Écouteurs pour la partie
       TicTacToeService.onGameCreated((data) => {
         this.gameId = data.gameId;
@@ -85,47 +86,47 @@ class TicTacToePage {
         this.playerSymbol = 'X'; // Le créateur joue toujours avec X
         this.renderGame();
       });
-      
+
       TicTacToeService.onGameStarted((data) => {
         this.gameState = data.game;
         this.gameId = data.game.id; // S'assurer que l'ID de jeu est correctement stocké
-        
+
         this.playerSymbol = this.gameState.players.find(p => p.id === this.userId)?.symbol;
         this.isMyTurn = this.gameState.currentTurn === this.userId;
         this.renderGame();
       });
-      
+
       TicTacToeService.onBoardUpdated((data) => {
         this.gameState = data.game;
-        
+
         // S'assurer que l'ID du jeu est maintenu
         if (data.game && data.game.id) {
           if (this.gameId !== data.game.id) {
             this.gameId = data.game.id;
           }
         }
-        
+
         this.isMyTurn = this.gameState.currentTurn === this.userId;
         this.renderGame();
-        
+
         // Afficher une notification du dernier coup joué
         this.showNotification(`${data.lastMove.player} a joué en position ${data.lastMove.position + 1}`);
       });
-      
+
       TicTacToeService.onGameWon((data) => {
         this.gameState = data.game;
-        
+
         // S'assurer que l'ID du jeu est maintenu
         if (data.game && data.game.id && this.gameId !== data.game.id) {
           this.gameId = data.game.id;
         }
-        
+
         this.renderGame();
-        
-        const message = data.byForfeit 
-          ? `${data.winner} a gagné par forfait!` 
+
+        const message = data.byForfeit
+          ? `${data.winner} a gagné par forfait!`
           : `${data.winner} a gagné avec les ${data.winnerSymbol}!`;
-        
+
         // Si un montant de gains est spécifié, l'afficher
         if (data.winAmount) {
           this.showNotification(`${message} Gains: ${data.winAmount} GameCoins!`, 'success');
@@ -133,30 +134,30 @@ class TicTacToePage {
           this.showNotification(message, 'success');
         }
       });
-      
+
       TicTacToeService.onGameDraw((data) => {
         this.gameState = data.game;
-        
+
         // S'assurer que l'ID du jeu est maintenu
         if (data.game && data.game.id && this.gameId !== data.game.id) {
           this.gameId = data.game.id;
         }
-        
+
         this.renderGame();
         this.showNotification('Match nul!', 'warning');
       });
-      
+
       TicTacToeService.onPlayerLeft((data) => {
         this.showNotification(`${data.player} a quitté la partie`, 'error');
       });
-      
+
       TicTacToeService.onGameError((data) => {
         this.showNotification(data.message, 'error');
       });
-      
+
       // Rejoindre le lobby au démarrage
       TicTacToeService.joinLobby();
-      
+
     } catch (error) {
       console.error('Failed to setup socket connections:', error);
       this.showNotification('Impossible de se connecter au serveur de jeu', 'error');
@@ -183,15 +184,15 @@ class TicTacToePage {
       });
       return;
     }
-    
+
     const cell = e.target;
     const position = parseInt(cell.dataset.index, 10);
-    
+
     if (isNaN(position) || this.gameState.board[position] !== null) {
       console.warn(`Invalid position ${position} in game ${this.gameId}`);
       return;
     }
-    
+
     try {
       await TicTacToeService.playMove(this.gameId, position);
     } catch (error) {
@@ -201,43 +202,72 @@ class TicTacToePage {
   }
 
   /**
+   * Gérer les changements du champ numérique de mise
+   * @param {Event} e - Événement de changement du champ numérique
+   */
+  handleBetNumberChange(e) {
+    const value = parseInt(e.target.value, 10);
+    if (!isNaN(value)) {
+      // Mettre à jour le slider
+      const slider = document.getElementById('bet-amount-input');
+      if (slider) {
+        slider.value = value;
+      }
+    }
+  }
+
+  /**
+   * Gérer les changements du slider de mise
+   * @param {Event} e - Événement de changement du slider
+   */
+  handleBetAmountChange(e) {
+    const value = e.target.value;
+    
+    // Mettre à jour le champ numérique
+    const numberInput = document.getElementById('bet-amount-number');
+    if (numberInput) {
+      numberInput.value = value;
+    }
+  }
+
+  /**
    * Gérer la création d'une partie avec mise personnalisée
    * @param {Event} e - Événement du formulaire
    */
   async handleCreateGameWithBet(e) {
     e.preventDefault();
-    
-    // Récupérer le montant de la mise depuis le champ de formulaire
-    const betInput = document.getElementById('bet-amount-input');
+
+    // Récupérer le montant de la mise depuis le champ numérique
+    const betInput = document.getElementById('bet-amount-number');
     const betAmount = parseInt(betInput.value, 10);
-    
+
     // Validation simple du montant
     if (isNaN(betAmount) || betAmount <= 0) {
       this.showNotification('Veuillez saisir un montant valide (supérieur à 0)', 'error');
       return;
     }
-    
+
     // Vérifier si l'utilisateur a suffisamment de fonds
     try {
       const canBetResponse = await walletService.canPlaceBet(betAmount);
-      
+
       if (!canBetResponse.success || !canBetResponse.data.canPlaceBet) {
         this.showNotification('Fonds insuffisants pour placer ce pari', 'error');
         return;
       }
-      
+
       // Stocker le montant personnalisé
       this.customBetAmount = betAmount;
-      
+
       // Fermer le modal
       const modal = document.getElementById('bet-modal');
       if (modal) {
         modal.style.display = 'none';
       }
-      
+
       // Créer la partie avec le montant personnalisé
       await this.handleCreateGame();
-      
+
     } catch (error) {
       console.error('Erreur lors de la vérification des fonds:', error);
       this.showNotification(`Erreur: ${error.message}`, 'error');
@@ -245,29 +275,16 @@ class TicTacToePage {
   }
 
   /**
-   * Gérer les changements de montant de mise
-   * @param {Event} e - Événement de changement du slider
-   */
-  handleBetAmountChange(e) {
-    const value = e.target.value;
-    const previewAmount = document.getElementById('preview-amount');
-    
-    if (previewAmount) {
-      previewAmount.textContent = value;
-    }
-  }
-  
-  /**
    * Gérer la création d'une nouvelle partie
    */
   async handleCreateGame() {
     try {
       // Si un montant personnalisé a été défini, l'utiliser
       const betAmount = this.customBetAmount || this.betAmount;
-      
+
       // Créer la partie avec le montant de la mise
       await TicTacToeService.createGame(betAmount);
-      
+
       // Réinitialiser le montant personnalisé après la création
       this.customBetAmount = null;
     } catch (error) {
@@ -299,11 +316,11 @@ class TicTacToePage {
     this.playerSymbol = null;
     this.isMyTurn = false;
     this.hasBet = false;
-    
+
     try {
       // Rejoindre à nouveau le lobby
       await TicTacToeService.joinLobby();
-      
+
       // Rendre le lobby
       this.renderLobby();
     } catch (error) {
@@ -336,7 +353,7 @@ class TicTacToePage {
   addGameToList(gameId, creator, betAmount = 50) {
     const gamesList = document.getElementById('games-list');
     if (!gamesList) return;
-    
+
     const gameItem = document.createElement('div');
     gameItem.id = `game-${gameId}`;
     gameItem.className = 'game-item';
@@ -344,9 +361,9 @@ class TicTacToePage {
       <span>Partie créée par ${creator} - Mise: ${betAmount} GC</span>
       <button class="join-game-btn">Rejoindre</button>
     `;
-    
+
     gamesList.appendChild(gameItem);
-    
+
     // Ajouter l'écouteur d'événement au bouton de participation
     const joinButton = gameItem.querySelector('.join-game-btn');
     joinButton.addEventListener('click', () => this.handleJoinGame(gameId));
@@ -360,13 +377,13 @@ class TicTacToePage {
   showNotification(message, type = 'info') {
     const notificationsContainer = document.getElementById('notifications');
     if (!notificationsContainer) return;
-    
+
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
     notification.textContent = message;
-    
+
     notificationsContainer.appendChild(notification);
-    
+
     // Supprimer la notification après 5 secondes
     setTimeout(() => {
       notification.classList.add('fade-out');
@@ -389,8 +406,7 @@ class TicTacToePage {
       </div>
       
       <div class="game-actions">
-        <button id="create-game-btn" class="primary-btn">Créer une partie standard (50 GC)</button>
-        <button id="create-custom-game-btn" class="secondary-btn">Créer une partie avec mise personnalisée</button>
+        <button id="create-custom-game-btn" class="primary-btn">Créer une partie</button>
       </div>
       
       <div class="available-games">
@@ -408,15 +424,23 @@ class TicTacToePage {
           <form id="bet-form">
             <div class="form-group">
               <label for="bet-amount-input">Montant de la mise (GameCoins)</label>
-              <input 
-                type="range" 
-                id="bet-amount-input" 
-                min="10" 
-                max="1000" 
-                step="10" 
-                value="50"
-              >
-              <output id="preview-amount">50</output>
+              <div class="bet-input-group">
+                <input 
+                  type="range" 
+                  id="bet-amount-input" 
+                  min="10" 
+                  max="1000" 
+                  step="10" 
+                  value="50"
+                >
+                <input 
+                  type="number" 
+                  id="bet-amount-number" 
+                  min="10" 
+                  max="1000" 
+                  value="50"
+                >
+              </div>
             </div>
             <p class="bet-info">Le gagnant remportera le total des mises des deux joueurs.</p>
             <button type="submit" class="primary-btn">Créer la partie</button>
@@ -426,14 +450,8 @@ class TicTacToePage {
       
       <div id="notifications" class="notifications-container"></div>
     `;
-    
+
     // Ajouter les écouteurs d'événements
-    const createGameBtn = this.container.querySelector('#create-game-btn');
-    if (createGameBtn) {
-      createGameBtn.addEventListener('click', this.handleCreateGame);
-    }
-    
-    // Écouteur pour le bouton de partie personnalisée
     const createCustomGameBtn = this.container.querySelector('#create-custom-game-btn');
     if (createCustomGameBtn) {
       createCustomGameBtn.addEventListener('click', () => {
@@ -443,19 +461,25 @@ class TicTacToePage {
         }
       });
     }
-    
+
     // Écouteur pour le formulaire de pari
     const betForm = this.container.querySelector('#bet-form');
     if (betForm) {
       betForm.addEventListener('submit', this.handleCreateGameWithBet);
     }
-    
+
     // Écouteur pour le slider de montant
     const betAmountInput = this.container.querySelector('#bet-amount-input');
     if (betAmountInput) {
       betAmountInput.addEventListener('input', this.handleBetAmountChange);
     }
-    
+
+    // Écouteur pour le champ numérique
+    const betAmountNumber = this.container.querySelector('#bet-amount-number');
+    if (betAmountNumber) {
+      betAmountNumber.addEventListener('input', this.handleBetNumberChange);
+    }
+
     // Écouteur pour fermer le modal
     const closeModal = this.container.querySelector('.close-modal');
     if (closeModal) {
@@ -473,40 +497,40 @@ class TicTacToePage {
    */
   renderGame() {
     if (!this.gameState) return;
-    
+
     // Déterminer le statut de la partie et le message à afficher
     let statusMessage = '';
     let gameStatus = this.gameState.status;
-    
+
     if (gameStatus === 'waiting') {
       statusMessage = `En attente d'un autre joueur...`;
     } else if (gameStatus === 'playing') {
       const currentPlayer = this.gameState.players.find(p => p.id === this.gameState.currentTurn);
-      statusMessage = this.isMyTurn 
-        ? `C'est votre tour (${this.playerSymbol})` 
+      statusMessage = this.isMyTurn
+        ? `C'est votre tour (${this.playerSymbol})`
         : `C'est le tour de ${currentPlayer?.name} (${currentPlayer?.symbol})`;
     } else if (gameStatus === 'finished') {
       if (this.gameState.winner) {
         const winner = this.gameState.players.find(p => p.id === this.gameState.winner);
-        statusMessage = this.gameState.winner === this.userId 
-          ? 'Vous avez gagné!' 
+        statusMessage = this.gameState.winner === this.userId
+          ? 'Vous avez gagné!'
           : `${winner?.name} a gagné!`;
       } else {
         statusMessage = 'Match nul!';
       }
     }
-    
+
     // Récupérer le montant de la mise depuis l'état du jeu
     const betAmount = this.gameState.betAmount || this.betAmount;
-    
+
     // Générer le HTML du plateau
     const boardHTML = this.gameState.board.map((cell, index) => {
       const cellValue = cell || '';
       const cellClass = `ttt-cell ${cell ? `cell-${cell.toLowerCase()}` : ''} ${this.isMyTurn && !cell ? 'clickable' : ''}`;
-      
+
       return `<div class="${cellClass}" data-index="${index}">${cellValue}</div>`;
     }).join('');
-    
+
     // Rendre le contenu
     this.container.innerHTML = `
       <div class="game-header">
@@ -528,21 +552,21 @@ class TicTacToePage {
       </div>
       
       <div class="game-actions">
-        ${gameStatus === 'finished' 
-          ? '<button id="back-to-lobby-btn" class="secondary-btn">Retour au lobby</button>' 
-          : `
+        ${gameStatus === 'finished'
+        ? '<button id="back-to-lobby-btn" class="secondary-btn">Retour au lobby</button>'
+        : `
             <button id="leave-game-btn" class="danger-btn">Quitter la partie</button>
-            ${!this.hasBet && gameStatus === 'playing' ? 
-              `<button id="place-bet-btn" class="primary-btn">Parier ${betAmount} GameCoins</button>` : 
-              ''
-            }
-          `
+            ${!this.hasBet && gameStatus === 'playing' ?
+          `<button id="place-bet-btn" class="primary-btn">Parier ${betAmount} GameCoins</button>` :
+          ''
         }
+          `
+      }
       </div>
       
       <div id="notifications" class="notifications-container"></div>
     `;
-    
+
     // Ajouter les écouteurs d'événements
     if (gameStatus === 'finished') {
       const backToLobbyBtn = this.container.querySelector('#back-to-lobby-btn');
@@ -554,14 +578,14 @@ class TicTacToePage {
       if (leaveGameBtn) {
         leaveGameBtn.addEventListener('click', this.handleLeaveGame);
       }
-      
+
       // Ajouter l'écouteur pour le bouton de pari s'il existe
       const placeBetBtn = this.container.querySelector('#place-bet-btn');
       if (placeBetBtn) {
         placeBetBtn.addEventListener('click', this.handlePlaceBet);
       }
     }
-    
+
     // Ajouter les écouteurs pour les cellules clickables
     if (gameStatus === 'playing' && this.isMyTurn) {
       const cells = this.container.querySelectorAll('.ttt-cell.clickable');
@@ -577,7 +601,7 @@ class TicTacToePage {
   async afterRender() {
     try {
       await this.setupEventListeners();
-      
+
       // Rendre le lobby initialement
       this.renderLobby();
     } catch (error) {
@@ -595,26 +619,26 @@ class TicTacToePage {
         this.showNotification('Impossible de placer un pari sans partie active', 'error');
         return;
       }
-      
+
       if (this.hasBet) {
         this.showNotification('Vous avez déjà placé un pari pour cette partie', 'warning');
         return;
       }
-      
+
       // Utiliser le montant défini dans l'état du jeu
       const betAmount = this.gameState.betAmount || this.betAmount;
-      
+
       // Vérifier d'abord si l'utilisateur peut placer le pari
       const canBetResponse = await walletService.canPlaceBet(betAmount);
-      
+
       if (!canBetResponse.success || !canBetResponse.data.canPlaceBet) {
         this.showNotification('Fonds insuffisants pour placer ce pari', 'error');
         return;
       }
-      
+
       // Placer le pari
       const betResponse = await walletService.placeBet(this.gameId, betAmount, 'Morpion');
-      
+
       if (betResponse.success) {
         this.hasBet = true;
         this.showNotification(`Pari de ${betAmount} GameCoins placé avec succès!`, 'success');
@@ -632,7 +656,7 @@ class TicTacToePage {
     try {
       // Nettoyer les écouteurs d'événements
       TicTacToeService.clearListeners();
-      
+
       // Si dans une partie, la quitter proprement
       if (this.gameId) {
         await TicTacToeService.leaveGame(this.gameId);
@@ -654,7 +678,7 @@ class TicTacToePage {
         <div class="spinner"></div>
       </div>
     `;
-    
+
     return this.container;
   }
 }

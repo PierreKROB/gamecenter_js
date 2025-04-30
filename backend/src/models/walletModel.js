@@ -58,7 +58,7 @@ class WalletClass {
      */
     static async getOrCreateWallet(userId) {
         let wallet = await this.findOne({ user: userId });
-        
+
         if (!wallet) {
             // Créer un nouveau portefeuille avec le solde par défaut
             wallet = await this.create({
@@ -71,7 +71,7 @@ class WalletClass {
                 }]
             });
         }
-        
+
         return wallet;
     }
 
@@ -90,7 +90,7 @@ class WalletClass {
         }
 
         const wallet = await this.getOrCreateWallet(userId);
-        
+
         // Ajouter la transaction
         wallet.transactions.push({
             type,
@@ -99,10 +99,10 @@ class WalletClass {
             gameId,
             createdAt: new Date()
         });
-        
+
         // Mettre à jour le solde
         wallet.balance += amount;
-        
+
         await wallet.save();
         return wallet;
     }
@@ -122,12 +122,12 @@ class WalletClass {
         }
 
         const wallet = await this.getOrCreateWallet(userId);
-        
+
         // Vérifier si le solde est suffisant
         if (wallet.balance < amount) {
             throw new APIError('Solde insuffisant', status.BAD_REQUEST);
         }
-        
+
         // Ajouter la transaction
         wallet.transactions.push({
             type,
@@ -136,10 +136,10 @@ class WalletClass {
             gameId,
             createdAt: new Date()
         });
-        
+
         // Mettre à jour le solde
         wallet.balance -= amount;
-        
+
         await wallet.save();
         return wallet;
     }
@@ -168,28 +168,28 @@ class WalletClass {
         // Vérifier que les deux joueurs ont suffisamment de fonds
         const player1HasFunds = await this.hasSufficientFunds(player1Id, betAmount);
         const player2HasFunds = await this.hasSufficientFunds(player2Id, betAmount);
-        
+
         if (!player1HasFunds || !player2HasFunds) {
             throw new APIError('Un ou plusieurs joueurs n\'ont pas suffisamment de fonds', status.BAD_REQUEST);
         }
-        
+
         // Retirer les fonds des deux joueurs
         await this.removeFunds(
-            player1Id, 
-            betAmount, 
-            `Mise pour une partie de ${gameType}`, 
+            player1Id,
+            betAmount,
+            `Mise pour une partie de ${gameType}`,
             gameId,
             'bet'
         );
-        
+
         await this.removeFunds(
-            player2Id, 
-            betAmount, 
-            `Mise pour une partie de ${gameType}`, 
+            player2Id,
+            betAmount,
+            `Mise pour une partie de ${gameType}`,
             gameId,
             'bet'
         );
-        
+
         return {
             success: true,
             totalPot: betAmount * 2
@@ -209,28 +209,28 @@ class WalletClass {
         // Vérifier que les deux joueurs ont suffisamment de fonds
         const player1HasFunds = await this.hasSufficientFunds(player1Id, betAmount);
         const player2HasFunds = await this.hasSufficientFunds(player2Id, betAmount);
-        
+
         if (!player1HasFunds || !player2HasFunds) {
             throw new APIError('Un ou plusieurs joueurs n\'ont pas suffisamment de fonds', status.BAD_REQUEST);
         }
-        
+
         // Retirer les fonds des deux joueurs
         await this.removeFunds(
-            player1Id, 
-            betAmount, 
-            `Mise pour une partie de ${gameType}`, 
+            player1Id,
+            betAmount,
+            `Mise pour une partie de ${gameType}`,
             gameId,
             'bet'
         );
-        
+
         await this.removeFunds(
-            player2Id, 
-            betAmount, 
-            `Mise pour une partie de ${gameType}`, 
+            player2Id,
+            betAmount,
+            `Mise pour une partie de ${gameType}`,
             gameId,
             'bet'
         );
-        
+
         return {
             success: true,
             totalPot: betAmount * 2
@@ -272,7 +272,7 @@ class WalletClass {
             gameId,
             'win'
         );
-        
+
         await this.addFunds(
             player2Id,
             betAmount,
@@ -280,7 +280,7 @@ class WalletClass {
             gameId,
             'win'
         );
-        
+
         return {
             success: true,
             message: 'Les deux joueurs ont été remboursés'
@@ -295,18 +295,18 @@ class WalletClass {
      */
     static async getTransactionHistory(userId, options = {}) {
         const wallet = await this.getOrCreateWallet(userId);
-        
+
         // Trier par date décroissante (plus récent en premier)
         let transactions = wallet.transactions.sort((a, b) => b.createdAt - a.createdAt);
-        
+
         // Pagination simple
         const page = options.page || 1;
         const limit = options.limit || 10;
         const startIndex = (page - 1) * limit;
         const endIndex = page * limit;
-        
+
         transactions = transactions.slice(startIndex, endIndex);
-        
+
         return {
             transactions,
             total: wallet.transactions.length,

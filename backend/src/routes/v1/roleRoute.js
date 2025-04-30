@@ -11,7 +11,6 @@ router.get('/', authenticate('role:read'), validate(roleValidation.getRoles), ca
 router.post('/', authenticate('role:create'), validate(roleValidation.createRole), catchAsync(roleController.createRole));
 router.get('/:roleId', authenticate('role:read'), validate(roleValidation.getRole), catchAsync(roleController.getRole));
 router.put('/:roleId', authenticate('role:update'), validate(roleValidation.updateRole), catchAsync(roleController.updateRole));
-router.delete('/:roleId',authenticate('role:delete'),validate(roleValidation.deleteRole),catchAsync(roleController.deleteRole)
-);
+router.delete('/:roleId', authenticate('role:delete'), validate(roleValidation.deleteRole), catchAsync(roleController.deleteRole));
 
 export default router;

@@ -89,7 +89,6 @@ class App {
         }
         break;
       case '/home':
-      case '/welcome': // Pour la compatibilité avec les anciens liens
         if (!isAuthenticated) {
           window.location.hash = '/login';
           return;

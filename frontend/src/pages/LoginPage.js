@@ -37,7 +37,7 @@ class LoginPage {
     try {
       await authService.login({ userName, password });
       // Redirection vers la page d'accueil
-      window.location.hash = '/welcome';
+      window.location.hash = '/home';
     } catch (error) {
       console.error('Erreur de connexion:', error);
       errorElement.textContent = error.errors ?

@@ -84,7 +84,8 @@ const setupTicTacToe = (socket, gamesNamespace) => {
         if (game.status === 'waiting') {
           availableGames.push({
             gameId,
-            creator: game.creatorName
+            creator: game.creatorName,
+            betAmount: game.betAmount || 50
           });
         }
       }
@@ -102,7 +103,7 @@ const setupTicTacToe = (socket, gamesNamespace) => {
   });
   
   // Créer une nouvelle partie de morpion
-  socket.on('createTicTacToeGame', async () => {
+  socket.on('createTicTacToeGame', async (data = {}) => {
     try {
       // Générer un ID unique pour la partie
       const timestamp = Date.now();
@@ -118,7 +119,28 @@ const setupTicTacToe = (socket, gamesNamespace) => {
         }
       }
       
+      // Récupérer le montant de la mise (par défaut: 50)
+      const betAmount = data.betAmount ? parseInt(data.betAmount, 10) : 50;
+      
+      if (isNaN(betAmount) || betAmount <= 0) {
+        return socket.emit('gameError', { message: 'Invalid bet amount' });
+      }
+      
+      // Vérifier si le joueur a suffisamment de fonds
+      const Wallet = require('../../models/walletModel').default;
+      const hasFunds = await Wallet.hasSufficientFunds(user.id, betAmount);
+      
+      if (!hasFunds) {
+        return socket.emit('gameError', { message: 'Insufficient funds for this bet amount' });
+      }
+      
       // Quitter les autres salles (dont le lobby) sauf celle de connexion
+      Array.from(socket.rooms)
+        .filter(room => room !== socket.id)
+        .forEach(room => {
+          logger.info(`User ${user.userName} leaving room ${room} to create game ${gameId}`);
+          socket.leave(room);
+        });
       Array.from(socket.rooms)
         .filter(room => room !== socket.id)
         .forEach(room => {
@@ -141,7 +163,8 @@ const setupTicTacToe = (socket, gamesNamespace) => {
           }
         ],
         status: 'waiting', // waiting, playing, finished
-        created: timestamp
+        created: timestamp,
+        betAmount: betAmount // Ajouter le montant de la mise
       });
       
       // Rejoindre la salle de jeu
@@ -159,11 +182,12 @@ const setupTicTacToe = (socket, gamesNamespace) => {
         // Annoncer la nouvelle partie dans le lobby
         gamesNamespace.to('ticTacToeLobby').emit('newGameAvailable', {
           gameId,
-          creator: user.userName
+          creator: user.userName,
+          betAmount: betAmount // Ajouter le montant de la mise à l'annonce
         });
       }
       
-      logger.info(`User ${user.userName} created TicTacToe game: ${gameId}`);
+      logger.info(`User ${user.userName} created TicTacToe game: ${gameId} with bet amount: ${betAmount}GC`);
       
       // Planifier un nettoyage automatique des parties abandonnées
       setTimeout(() => {
@@ -214,6 +238,15 @@ const setupTicTacToe = (socket, gamesNamespace) => {
       if (game.players.some(p => p.id === user.id)) {
         logger.error(`User ${user.userName} is already in game ${gameId}`);
         return socket.emit('gameError', { message: 'You are already in this game' });
+      }
+      
+      // Vérifier si le joueur a suffisamment de fonds pour la mise
+      const Wallet = require('../../models/walletModel').default;
+      const hasFunds = await Wallet.hasSufficientFunds(user.id, game.betAmount || 50);
+      
+      if (!hasFunds) {
+        logger.error(`User ${user.userName} has insufficient funds for game ${gameId} (bet: ${game.betAmount || 50})`);
+        return socket.emit('gameError', { message: `Insufficient funds. This game requires ${game.betAmount || 50} GameCoins.` });
       }
       
       // Quitter les autres salles (dont le lobby) sauf celle de connexion

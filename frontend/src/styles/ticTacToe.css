@@ -1,4 +1,27 @@
-/* Styles pour le jeu de morpion */
+.bet-input-group {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin: 15px 0;
+}
+
+.bet-input-group input[type="range"] {
+  flex: 3;
+  margin: 0;
+}
+
+.bet-input-group input[type="number"] {
+  flex: 1;
+  width: 80px;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  text-align: center;
+}
+
+#bet-form .form-group {
+  margin-bottom: 20px;
+}/* Styles pour le jeu de morpion */
 .game-container {
   max-width: 600px;
   margin: 30px auto;
