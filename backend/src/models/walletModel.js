@@ -190,9 +190,11 @@ class WalletClass {
             'bet'
         );
 
+        // Retourner le montant total du pot avec un montant par joueur pour les remboursements
         return {
             success: true,
-            totalPot: betAmount * 2
+            totalPot: betAmount * 2,
+            betPerPlayer: betAmount
         };
     }
 
@@ -241,11 +243,18 @@ class WalletClass {
      * Attribuer les gains au vainqueur
      * @param {string} gameId - ID de la partie
      * @param {string} winnerId - ID du joueur gagnant
-     * @param {number} amount - Montant à attribuer
+     * @param {number} amount - Montant à attribuer (pot total)
      * @param {string} gameType - Type de jeu
      * @returns {Promise<Wallet>} - Portefeuille mis à jour du vainqueur
      */
     static async awardWinner(gameId, winnerId, amount, gameType) {
+        // Vérifier que le montant est bien positif
+        if (amount <= 0) {
+            throw new APIError('Le montant des gains doit être positif', status.BAD_REQUEST);
+        }
+
+        // Le joueur reçoit le montant total composé de sa mise et celle de son adversaire
+        // On fait une transaction directe pour le montant total plutôt que de d'abord rembourser la mise
         return await this.addFunds(
             winnerId,
             amount,

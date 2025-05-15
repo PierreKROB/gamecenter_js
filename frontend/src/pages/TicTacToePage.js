@@ -14,11 +14,11 @@ class TicTacToePage {
     this.playerSymbol = null;
     this.isMyTurn = false;
     this.userId = authService.getStoredUser()?.id;
-    this.betAmount = 50; // Montant par défaut pour une partie de morpion
-    this.customBetAmount = null; // Montant personnalisé de la mise
-    this.hasBet = false; // Indique si le joueur a déjà misé
+    this.betAmount = 50;
+    this.customBetAmount = null;
+    this.hasBet = false;
+    this.winAmount = null; // Nouveau : stocke le montant des gains reçus
 
-    // Lier les méthodes
     this.setupEventListeners = this.setupEventListeners.bind(this);
     this.handleCellClick = this.handleCellClick.bind(this);
     this.handleCreateGame = this.handleCreateGame.bind(this);
@@ -26,7 +26,7 @@ class TicTacToePage {
     this.handleJoinGame = this.handleJoinGame.bind(this);
     this.handleLeaveGame = this.handleLeaveGame.bind(this);
     this.handleBackToLobby = this.handleBackToLobby.bind(this);
-    this.handlePlaceBet = this.handlePlaceBet.bind(this);
+    // handlePlaceBet a été supprimé car les paris sont automatiques
     this.handleBetAmountChange = this.handleBetAmountChange.bind(this);
     this.handleBetNumberChange = this.handleBetNumberChange.bind(this);
   }
@@ -127,9 +127,13 @@ class TicTacToePage {
           ? `${data.winner} a gagné par forfait!`
           : `${data.winner} a gagné avec les ${data.winnerSymbol}!`;
 
-        // Si un montant de gains est spécifié, l'afficher
+        // Afficher les gains avec le montant si spécifié
+        const betAmount = this.gameState.betAmount || this.betAmount;
         if (data.winAmount) {
-          this.showNotification(`${message} Gains: ${data.winAmount} GameCoins!`, 'success');
+          // Stocker le montant des gains pour l'affichage
+          this.winAmount = data.winAmount;
+          // Assurer que le montant des gains est bien celui reçu du serveur
+          this.showNotification(`${message} Gains: ${this.winAmount} GameCoins!`, 'success');
         } else {
           this.showNotification(message, 'success');
         }
@@ -316,6 +320,7 @@ class TicTacToePage {
     this.playerSymbol = null;
     this.isMyTurn = false;
     this.hasBet = false;
+    this.winAmount = null; // Réinitialiser le montant des gains
 
     try {
       // Rejoindre à nouveau le lobby
@@ -501,6 +506,7 @@ class TicTacToePage {
     // Déterminer le statut de la partie et le message à afficher
     let statusMessage = '';
     let gameStatus = this.gameState.status;
+    let winMessage = '';
 
     if (gameStatus === 'waiting') {
       statusMessage = `En attente d'un autre joueur...`;
@@ -512,11 +518,19 @@ class TicTacToePage {
     } else if (gameStatus === 'finished') {
       if (this.gameState.winner) {
         const winner = this.gameState.players.find(p => p.id === this.gameState.winner);
-        statusMessage = this.gameState.winner === this.userId
-          ? 'Vous avez gagné!'
-          : `${winner?.name} a gagné!`;
+        if (this.gameState.winner === this.userId) {
+          statusMessage = 'Vous avez gagné!';
+          // Utiliser le montant des gains réel reçu de l'événement si disponible
+          const winAmount = this.winAmount || (betAmount * 2);
+          // Assurer que nous montrons le montant exact reçu du serveur
+          winMessage = `Vous avez reçu ${winAmount} GameCoins de gains!`;
+        } else {
+          statusMessage = `${winner?.name} a gagné!`;
+        }
       } else {
         statusMessage = 'Match nul!';
+        // Ajouter un message sur le remboursement en cas de match nul
+        winMessage = `Votre mise de ${betAmount} GameCoins a été remboursée.`;
       }
     }
 
@@ -536,6 +550,7 @@ class TicTacToePage {
       <div class="game-header">
         <h1>Morpion</h1>
         <p class="game-status">${statusMessage}</p>
+        ${winMessage ? `<p class="game-win-message">${winMessage}</p>` : ''}
         <p class="game-bet">Mise: ${betAmount} GameCoins par joueur (pot: ${betAmount * 2} GC)</p>
       </div>
       
@@ -556,10 +571,6 @@ class TicTacToePage {
         ? '<button id="back-to-lobby-btn" class="secondary-btn">Retour au lobby</button>'
         : `
             <button id="leave-game-btn" class="danger-btn">Quitter la partie</button>
-            ${!this.hasBet && gameStatus === 'playing' ?
-          `<button id="place-bet-btn" class="primary-btn">Parier ${betAmount} GameCoins</button>` :
-          ''
-        }
           `
       }
       </div>
@@ -577,12 +588,6 @@ class TicTacToePage {
       const leaveGameBtn = this.container.querySelector('#leave-game-btn');
       if (leaveGameBtn) {
         leaveGameBtn.addEventListener('click', this.handleLeaveGame);
-      }
-
-      // Ajouter l'écouteur pour le bouton de pari s'il existe
-      const placeBetBtn = this.container.querySelector('#place-bet-btn');
-      if (placeBetBtn) {
-        placeBetBtn.addEventListener('click', this.handlePlaceBet);
       }
     }
 
@@ -610,44 +615,7 @@ class TicTacToePage {
     }
   }
 
-  /**
-   * Gérer le placement d'un pari pour une partie
-   */
-  async handlePlaceBet() {
-    try {
-      if (!this.gameId) {
-        this.showNotification('Impossible de placer un pari sans partie active', 'error');
-        return;
-      }
-
-      if (this.hasBet) {
-        this.showNotification('Vous avez déjà placé un pari pour cette partie', 'warning');
-        return;
-      }
-
-      // Utiliser le montant défini dans l'état du jeu
-      const betAmount = this.gameState.betAmount || this.betAmount;
-
-      // Vérifier d'abord si l'utilisateur peut placer le pari
-      const canBetResponse = await walletService.canPlaceBet(betAmount);
-
-      if (!canBetResponse.success || !canBetResponse.data.canPlaceBet) {
-        this.showNotification('Fonds insuffisants pour placer ce pari', 'error');
-        return;
-      }
-
-      // Placer le pari
-      const betResponse = await walletService.placeBet(this.gameId, betAmount, 'Morpion');
-
-      if (betResponse.success) {
-        this.hasBet = true;
-        this.showNotification(`Pari de ${betAmount} GameCoins placé avec succès!`, 'success');
-      }
-    } catch (error) {
-      console.error('Error placing bet:', error);
-      this.showNotification(`Erreur lors du placement du pari: ${error.message}`, 'error');
-    }
-  }
+  // La méthode handlePlaceBet est supprimée car les paris sont désormais automatiquement traités côté serveur
 
   /**
    * Méthode appelée lors de la destruction du composant

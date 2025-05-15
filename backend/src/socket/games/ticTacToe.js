@@ -118,14 +118,14 @@ const setupTicTacToe = (socket, gamesNamespace) => {
           return socket.emit('gameError', { message: 'You already have a game waiting for players' });
         }
       }
-      
+
       // Récupérer le montant de la mise (par défaut: 50)
       const betAmount = data.betAmount ? parseInt(data.betAmount, 10) : 50;
-      
+
       if (isNaN(betAmount) || betAmount <= 0) {
         return socket.emit('gameError', { message: 'Invalid bet amount' });
       }
-      
+
       // Vérifier si le joueur a suffisamment de fonds
       const Wallet = require('../../models/walletModel').default;
       const hasFunds = await Wallet.hasSufficientFunds(user.id, betAmount);
@@ -164,7 +164,8 @@ const setupTicTacToe = (socket, gamesNamespace) => {
         ],
         status: 'waiting', // waiting, playing, finished
         created: timestamp,
-        betAmount: betAmount // Ajouter le montant de la mise
+        betAmount: betAmount, // Ajouter le montant de la mise
+        betsPlaced: false // Flag pour suivre si les paris ont été placés
       });
       
       // Rejoindre la salle de jeu
@@ -271,8 +272,47 @@ const setupTicTacToe = (socket, gamesNamespace) => {
       socket.join(gameId);
       logger.info(`User ${user.userName} has joined room ${gameId}`);
       
-      // Informer tous les joueurs que la partie commence
-      gamesNamespace.to(gameId).emit('gameStarted', { game });
+      // Traiter automatiquement les paris pour les deux joueurs
+      try {
+        const creator = game.players.find(p => p.id === game.creator);
+        const joinedPlayer = game.players.find(p => p.id === user.id);
+        
+        if (creator && joinedPlayer) {
+          const betAmount = game.betAmount || 50;
+          
+          // Informer tous les joueurs que la partie commence avant même de traiter les paris
+          // pour éviter des problèmes de synchronisation
+          gamesNamespace.to(gameId).emit('gameStarted', { game });
+          
+          // Placer les paris pour les deux joueurs
+          Wallet.processBetByPlayers(
+            gameId,
+            creator.id,
+            joinedPlayer.id,
+            betAmount,
+            'Morpion'
+          )
+            .then(() => {
+              logger.info(`Bet processed for game ${gameId}: ${betAmount} GameCoins from each player`);
+              // Marquer explicitement le jeu comme ayant des paris placés
+              game.betsPlaced = true;
+              
+              // Stocker le montant du pari dans l'objet game pour référence future
+              game.betPerPlayer = betAmount;
+            })
+            .catch(betError => {
+              logger.error(`Error processing bets for game ${gameId}:`, betError);
+              // La partie continue même si le pari échoue
+            });
+        } else {
+          // Si pour une raison quelconque les joueurs ne sont pas trouvables, continuer la partie sans pari
+          gamesNamespace.to(gameId).emit('gameStarted', { game });
+        }
+      } catch (betError) {
+        logger.error(`Error processing bets for game ${gameId}:`, betError);
+        // La partie peut continuer même si le pari échoue
+        gamesNamespace.to(gameId).emit('gameStarted', { game });
+      }
       
       // Retirer la partie de la liste des parties disponibles
       gamesNamespace.to('ticTacToeLobby').emit('gameRemoved', { gameId });
@@ -365,16 +405,94 @@ const setupTicTacToe = (socket, gamesNamespace) => {
         game.status = 'finished';
         game.winner = user.id;
         game.finished = Date.now();
-        gamesNamespace.to(gameId).emit('gameWon', { 
-          game,
-          winner: user.userName,
-          winnerSymbol: playerSymbol
-        });
+        
+        // Attribuer les gains au vainqueur si les paris ont été placés
+        try {
+          if (game.betsPlaced) {
+            const Wallet = require('../../models/walletModel').default;
+            const betAmount = game.betAmount || 50;
+            // Explicitement fixer le pot total comme étant le double de la mise
+            const totalPot = betAmount * 2; // mise joueur 1 + mise joueur 2
+            
+            // Attribuer le pot total au gagnant
+            // Pour une mise de 15 chacun, le gagnant doit recevoir 30 (15 + 15)
+            const fixedWinnings = betAmount * 2;
+            Wallet.awardWinner(gameId, user.id, fixedWinnings, 'Morpion')
+              .then(() => {
+                logger.info(`Winnings awarded to ${user.userName} in game ${gameId}: ${fixedWinnings} GameCoins`);
+              })
+              .catch(winningsError => {
+                logger.error(`Error awarding winnings in game ${gameId}:`, winningsError);
+              });
+            
+            // Informer immédiatement les joueurs de la victoire avec le montant des gains
+            // Ne pas attendre la fin de l'opération de portefeuille pour annoncer la victoire
+            // Nous calculons le montant total des gains = mise du joueur + mise de l'adversaire
+            gamesNamespace.to(gameId).emit('gameWon', { 
+              game,
+              winner: user.userName,
+              winnerSymbol: playerSymbol,
+              // Le gagnant reçoit sa mise + celle de l'adversaire
+              winAmount: fixedWinnings
+            });
+          } else {
+            // Si pas de paris enregistrés, informer de la victoire sans montant
+            gamesNamespace.to(gameId).emit('gameWon', { 
+              game,
+              winner: user.userName,
+              winnerSymbol: playerSymbol
+            });
+          }
+        } catch (winningsError) {
+          logger.error(`Error awarding winnings in game ${gameId}:`, winningsError);
+          // Informer quand même de la victoire même si l'attribution des gains échoue
+          gamesNamespace.to(gameId).emit('gameWon', { 
+            game,
+            winner: user.userName,
+            winnerSymbol: playerSymbol
+          });
+        }
+        
         logger.info(`User ${user.userName} won TicTacToe game: ${gameId}`);
       } else if (isDraw) {
         game.status = 'finished';
         game.finished = Date.now();
-        gamesNamespace.to(gameId).emit('gameDraw', { game });
+        
+        // Rembourser les joueurs en cas de match nul si les paris ont été placés
+        try {
+          if (game.betsPlaced) {
+            const Wallet = require('../../models/walletModel').default;
+            const betAmount = game.betAmount || 50;
+            
+            // Récupérer les IDs des deux joueurs
+            const player1 = game.players[0];
+            const player2 = game.players[1];
+            
+            if (player1 && player2) {
+              // Rembourser les deux joueurs
+              Wallet.refundDraw(gameId, player1.id, player2.id, betAmount, 'Morpion')
+                .then(() => {
+                  logger.info(`Players refunded in draw game ${gameId}: ${betAmount} GameCoins each`);
+                })
+                .catch(refundError => {
+                  logger.error(`Error refunding bets in draw game ${gameId}:`, refundError);
+                });
+            }
+            
+            // Informer immédiatement des résultats du match nul avec montant de remboursement
+            gamesNamespace.to(gameId).emit('gameDraw', { 
+              game,
+              refundAmount: betAmount
+            });
+          } else {
+            // Si pas de paris, simplement informer du match nul
+            gamesNamespace.to(gameId).emit('gameDraw', { game });
+          }
+        } catch (refundError) {
+          logger.error(`Error refunding bets in draw game ${gameId}:`, refundError);
+          gamesNamespace.to(gameId).emit('gameDraw', { game });
+        }
+        
         logger.info(`TicTacToe game ended in draw: ${gameId}`);
       } else {
         // Changer le tour
@@ -445,12 +563,53 @@ const setupTicTacToe = (socket, gamesNamespace) => {
         
         if (opponent) {
           game.winner = opponent.id;
-          gamesNamespace.to(gameId).emit('gameWon', { 
-            game,
-            winner: opponent.name,
-            winnerSymbol: opponent.symbol,
-            byForfeit: true
-          });
+          
+          // Attribuer les gains au vainqueur par forfait si les paris ont été placés
+          try {
+            if (game.betsPlaced) {
+              const Wallet = require('../../models/walletModel').default;
+              const betAmount = game.betAmount || 50;
+              const totalPot = betAmount * 2; // Double de la mise
+              
+              // Attribuer le pot total au gagnant par forfait
+              const fixedWinnings = betAmount * 2; // Pour une mise de 15 chacun, le gagnant doit recevoir 30 (15 + 15)
+              Wallet.awardWinner(gameId, opponent.id, fixedWinnings, 'Morpion')
+                .then(() => {
+                  logger.info(`Winnings awarded to ${opponent.name} in game ${gameId} by forfeit: ${fixedWinnings} GameCoins`);
+                })
+                .catch(winningsError => {
+                  logger.error(`Error awarding winnings in forfeit game ${gameId}:`, winningsError);
+                });
+              
+              // Informer immédiatement les joueurs des gains avec le montant
+              gamesNamespace.to(gameId).emit('gameWon', { 
+                game,
+                winner: opponent.name,
+                winnerSymbol: opponent.symbol,
+                byForfeit: true,
+                // Le gagnant reçoit le pot total (sa mise + celle de l'adversaire)
+                winAmount: fixedWinnings
+              });
+            } else {
+              // Si pas de paris enregistrés, informer de la victoire sans montant
+              gamesNamespace.to(gameId).emit('gameWon', { 
+                game,
+                winner: opponent.name,
+                winnerSymbol: opponent.symbol,
+                byForfeit: true
+              });
+            }
+          } catch (winningsError) {
+            logger.error(`Error awarding winnings in forfeit game ${gameId}:`, winningsError);
+            // Informer quand même de la victoire même si l'attribution des gains échoue
+            gamesNamespace.to(gameId).emit('gameWon', { 
+              game,
+              winner: opponent.name,
+              winnerSymbol: opponent.symbol,
+              byForfeit: true
+            });
+          }
+          
           logger.info(`User ${opponent.name} won TicTacToe game by forfeit: ${gameId}`);
         }
       }
@@ -509,7 +668,47 @@ const setupTicTacToe = (socket, gamesNamespace) => {
               game.winner = opponent.id;
               logger.info(`Setting winner to ${opponent.name} (${opponent.id}) in game ${gameId}`);
               
+              // Attribuer les gains au vainqueur par déconnexion si les paris ont été placés
               try {
+                if (game.betsPlaced) {
+                  const Wallet = require('../../models/walletModel').default;
+                  const betAmount = game.betAmount || 50;
+                  const totalPot = betAmount * 2; // Double de la mise
+                  
+                  // Attribuer le pot total au gagnant par déconnexion
+                  const fixedWinnings = betAmount * 2; // Pour une mise de 15 chacun, le gagnant doit recevoir 30 (15 + 15)
+                  Wallet.awardWinner(gameId, opponent.id, fixedWinnings, 'Morpion')
+                    .then(() => {
+                      logger.info(`Winnings awarded to ${opponent.name} in game ${gameId} by disconnect: ${fixedWinnings} GameCoins`);
+                    })
+                    .catch(error => {
+                      logger.error(`Error processing win by disconnect in game ${gameId}:`, error);
+                    });
+                  
+                  // Informer immédiatement les joueurs des gains avec le montant
+                  gamesNamespace.to(gameId).emit('gameWon', { 
+                    game,
+                    winner: opponent.name,
+                    winnerSymbol: opponent.symbol,
+                    byForfeit: true,
+                    reason: 'opponent_disconnected',
+                    // Le gagnant reçoit le pot total (sa mise + celle de l'adversaire)
+                    winAmount: fixedWinnings
+                  });
+                } else {
+                  // Si pas de paris enregistrés, informer de la victoire sans montant
+                  gamesNamespace.to(gameId).emit('gameWon', { 
+                    game,
+                    winner: opponent.name,
+                    winnerSymbol: opponent.symbol,
+                    byForfeit: true,
+                    reason: 'opponent_disconnected'
+                  });
+                  logger.info(`User ${opponent.name} won TicTacToe game by forfeit (disconnect): ${gameId}`);
+                }
+              } catch (error) {
+                logger.error(`Error processing win by disconnect in game ${gameId}:`, error);
+                // Informer quand même de la victoire même si l'attribution des gains échoue
                 gamesNamespace.to(gameId).emit('gameWon', { 
                   game,
                   winner: opponent.name,
@@ -517,9 +716,7 @@ const setupTicTacToe = (socket, gamesNamespace) => {
                   byForfeit: true,
                   reason: 'opponent_disconnected'
                 });
-                logger.info(`User ${opponent.name} won TicTacToe game by forfeit (disconnect): ${gameId}`);
-              } catch (emitError) {
-                logger.error(`Error emitting gameWon event: ${emitError.message}`);
+                logger.error(`Error emitting gameWon event: ${error.message}`);
               }
             }
           }
